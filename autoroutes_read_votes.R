@@ -1,6 +1,7 @@
 # Charger les bibliothèques nécessaires
 library(jsonlite)
 library(dplyr)
+library(sf)
 
 # https://dam-api.bfs.admin.ch/hub/api/dam/assets/32588879/master
 # Charger le fichier JSON
@@ -43,6 +44,8 @@ names(communes_mutees) = communes_mutees[1,]
 communes_mutees = communes_mutees[-1,]
 names(communes_mutees) = c("no_mut", "old_canton", "old_no_district", "old_no_muni",
                          "old_name_muni", "new_canton", "new_no_district", "new_no_muni", "new_name_muni", "date")
+# Add berner mutual voters
+communes_mutees = rbind(communes_mutees, c(9999,"BE",9999, 629, "Oberhünigen", "BE", 9999, 628, "Zäziwil", "2024-01-01"))
 write.csv(communes_mutees, "communes_mutees_2024.csv", row.names = F)
 
 # Charger les données
@@ -130,12 +133,13 @@ detailed_language_2024 <- generer_detailed_language(annee = 2024)
 # 4 Bernese communes vote in other electoral districts
 # https://www.belex.sites.be.ch/app/fr/texts_of_law/141.111
 for (i in 1:dim(detailed_language_2024)[1]) {
-  # Niedermuhlern -> Wald
+  # Oberhünigen -> Zäziwil
   if (detailed_language_2024$BFS_n[i] == 629) { # if the commune has no polling station, it is aggregated
     detailed_language_2024$BFS_n[i] <- 628
     detailed_language_2024$municipality[i] <- "Zäziwil"
   }
 }
+
 # Sum same lines
 detailed_language_2024 <- detailed_language_2024 %>%
   group_by(BFS_n, municipality) %>%
@@ -143,3 +147,131 @@ detailed_language_2024 <- detailed_language_2024 %>%
 
 # Sauvegarder le résultat si nécessaire
 write.csv(detailed_language_2024, "detailed_language_2024.csv", row.names = FALSE)
+
+# Vérifier
+# View(cbind(detailed_language_2024[,1:2], swiss_data_muni[,1:2]))
+
+### --- Shapefiles
+ch = st_read("/Users/rloup/Documents/r_projects/spatial_autocorrelation_political_opinions/data/GIS_data/ch.shp")
+
+# Charger le fichier des mutations
+# communes_mutees <- read.csv("communes_mutees_2024.csv")
+
+# Filtrer les mutations pertinentes pour 2024
+# communes_mutees <- communes_mutees %>%
+#   filter(as.Date(DATUM_AEND) <= as.Date("2024-12-31"))
+
+# Joindre les mutations pour obtenir le BFS_NUMMER final
+ch <- ch %>%
+  left_join(communes_mutees %>% select(old_no_muni, new_no_muni, new_name_muni),
+            by = c("BFS_NUMMER" = "old_no_muni")) %>%
+  mutate(
+    BFS_FINAL = ifelse(is.na(new_no_muni), BFS_NUMMER, new_no_muni),
+    NAME = ifelse(is.na(new_name_muni), NAME, new_name_muni)  # Met à jour le nom si nécessaire
+  )
+
+# Agréger les surfaces et populations par BFS_NUMMER final
+ch_aggregated <- ch %>%
+  group_by(BFS_FINAL) %>%
+  summarise(
+    GEM_FLAECH = sum(GEM_FLAECH, na.rm = TRUE),  # Somme des surfaces
+    EINWOHNERZ = sum(EINWOHNERZ, na.rm = TRUE),  # Somme des populations
+    NAME = first(NAME),                          # Conserver un nom représentatif
+    BEZIRKSNUM = first(BEZIRKSNUM),              # Conserver un numéro de district unique
+    KANTONSNUM = first(KANTONSNUM),              # Conserver un numéro de canton unique
+    geometry = st_union(geometry)               # Union géométrique des polygones
+  )
+# Vérification des résultats
+dim(ch_aggregated)
+print(ch_aggregated)
+plot(ch_aggregated$geometry)
+View(cbind(ch_aggregated, swiss_data_muni[,1:2]))
+
+#### --- Communes centres
+communes_centres = read.csv("communes_ch_centres2024.csv")
+dim(communes_centres)
+View(cbind(communes_centres, swiss_data_muni[,1:2]))
+
+
+### --- Matrix fixing
+# Road distance matrix
+distance_mat = read.csv("/Users/rloup/Documents/r_projects/swiss_political_autocorrelation/distance_mat_2023.csv")
+rownames(distance_mat) = distance_mat[, 1]  # Set first column as row names
+distance_mat[, 1] = NULL  # Remove original column from data frame
+
+# Road time matrix
+time_mat = read.csv("/Users/rloup/Documents/r_projects/swiss_political_autocorrelation/time_mat_2023.csv")
+rownames(time_mat) = time_mat[, 1]  # Set first column as row names
+time_mat[, 1] = NULL  # Remove original column from data frame
+
+# # -- Load data to change
+# distance_mat = read.csv("distance_mat_2023.csv")
+# # set specific column as row names
+# rownames(distance_mat) = distance_mat[,1]
+# # remove original column from data frame
+# distance_mat[,1] = NULL
+
+matToChange = distance_mat
+matToChange = time_mat
+
+# time_mat = read.csv("time_mat_2023.csv")
+# # set specific column as row names
+# rownames(time_mat) = time_mat[,1]
+# # remove original column from data frame
+# time_mat[,1] = NULL
+# matToChange = time_mat
+
+# set initial and final index and name
+
+positionInit = which(dataVot$BFS_n==6775) # Bonfol
+positionFin = 2132
+newBFS = 6812
+
+# --- Computation
+# save column to move
+cMat = matToChange[,positionInit]
+# remove 0/1 which was in diagonal
+cMat = cMat[-positionInit]
+
+# save row to move
+rMat = matToChange[positionInit,]
+# remove 0/1 which was in diagonal
+rMat = rMat[-positionInit]
+rownames(rMat) = newBFS
+
+# Remove misplaced column/row
+matToChange = matToChange[-positionInit,-positionInit]
+
+# if last row/column
+matToChange = rbind(matToChange, rMat)
+cMat[2132] = 0
+matToChange = cbind(matToChange, cMat)
+matToChange = as.data.frame(matToChange)
+colnames(matToChange)[2132] = paste0("X", newBFS)
+# end if last row/column
+
+
+for (i in c(947, 993, 2456, 6773, 4042, 629)) {
+  positionRemove = which(dataVot$BFS_n == i)
+  matToChange = matToChange[-positionRemove,-positionRemove]
+}
+dim(matToChange)
+# Save results
+# write.csv(matToChange, "distance_mat_2024.csv")
+# write.csv(matToChange, "time_mat_2024.csv")
+
+# if not the last row/column to remove, process next lines
+
+# # add the row in the right index in the matrix
+# matToChange = rbind(matToChange[1:(positionFin-2), ], rMat, matToChange[(positionFin-1):nrow(matToChange), ])
+# 
+# # put the 0/1 at the right index of the new place
+# cMat = c(cMat[1:(positionFin-2)], 0, cMat[(positionFin-1):dim(matToChange)[2]])
+# cMat = as.data.frame(cMat)
+# colnames(cMat) = paste0("X", newBFS)
+# 
+# # Bind all the columns together
+# matToChange = cbind(matToChange[, 1:(positionFin-2)], cMat, matToChange[ ,(positionFin-1):ncol(matToChange+1)])
+# 
+# dim(matToChange)
+# View(matToChange)
