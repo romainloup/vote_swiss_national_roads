@@ -27,6 +27,8 @@ swiss_data_muni = swiss_data_muni %>%
 # Afficher le data frame résultant
 View(swiss_data_muni)
 dim(swiss_data_muni)
+# write.csv(swiss_data_muni, "swiss_data_muni.csv", row.names = F)
+
 
 dataVot = read.csv("/Users/rloup/Documents/r_projects/swiss_political_autocorrelation/votes2023/formatted_data/dataVot2023.csv")
 View(dataVot)
@@ -145,6 +147,16 @@ detailed_language_2024 <- detailed_language_2024 %>%
   group_by(BFS_n, municipality) %>%
   summarise(across(c(german, french, italian, other_lang, romansh), sum, na.rm = TRUE))
 
+# Ajouter la colonne language_region
+detailed_language_2024 <- detailed_language_2024 %>%
+  mutate(language_region = case_when(
+    german >= french & german >= italian & german >= romansh ~ 1,  # German-majority
+    french >= german & french >= italian & french >= romansh ~ 2,  # French-majority
+    italian >= german & italian >= french & italian >= romansh ~ 3, # Italian-majority
+    romansh >= german & romansh >= french & romansh >= italian ~ 4 # Romansh-majority
+  ))
+
+
 # Sauvegarder le résultat si nécessaire
 write.csv(detailed_language_2024, "detailed_language_2024.csv", row.names = FALSE)
 
@@ -204,6 +216,11 @@ time_mat = read.csv("/Users/rloup/Documents/r_projects/swiss_political_autocorre
 rownames(time_mat) = time_mat[, 1]  # Set first column as row names
 time_mat[, 1] = NULL  # Remove original column from data frame
 
+elev_dist = read.csv("/Users/rloup/Documents/r_projects/spatial_autocorrelation_political_opinions/data/distances/elev_dist_2023.csv")
+rownames(elev_dist) = time_mat[, 1]
+colnames(elev_dist) = colnames(time_mat)
+
+
 # # -- Load data to change
 # distance_mat = read.csv("distance_mat_2023.csv")
 # # set specific column as row names
@@ -213,6 +230,7 @@ time_mat[, 1] = NULL  # Remove original column from data frame
 
 matToChange = distance_mat
 matToChange = time_mat
+matToChange = elev_dist
 
 # time_mat = read.csv("time_mat_2023.csv")
 # # set specific column as row names
@@ -259,19 +277,88 @@ dim(matToChange)
 # Save results
 # write.csv(matToChange, "distance_mat_2024.csv")
 # write.csv(matToChange, "time_mat_2024.csv")
+# write.csv(matToChange, "elev_dist_2024.csv")
 
-# if not the last row/column to remove, process next lines
+# ------------------------------------------------------------------------------
+# Vote analysis
+swiss_data[[3]][[1]]
 
-# # add the row in the right index in the matrix
-# matToChange = rbind(matToChange[1:(positionFin-2), ], rMat, matToChange[(positionFin-1):nrow(matToChange), ])
-# 
-# # put the 0/1 at the right index of the new place
-# cMat = c(cMat[1:(positionFin-2)], 0, cMat[(positionFin-1):dim(matToChange)[2]])
-# cMat = as.data.frame(cMat)
-# colnames(cMat) = paste0("X", newBFS)
-# 
-# # Bind all the columns together
-# matToChange = cbind(matToChange[, 1:(positionFin-2)], cMat, matToChange[ ,(positionFin-1):ncol(matToChange+1)])
-# 
-# dim(matToChange)
-# View(matToChange)
+# --- Weight f: "voix valides"
+f = swiss_data_muni$resultat.gueltigeStimmen / sum(swiss_data_muni$resultat.gueltigeStimmen)
+n = length(f) # 2126
+
+# --- Centering matrix
+H = diag(n) - rep(1, n) %*% t(f) # centering matrix
+
+# --- Distances and kernels
+DX = as.matrix(dist(swiss_data_muni$resultat.jaStimmenInProzent)^2) # political distances between municipalities
+KX = -0.5 * diag(sqrt(f)) %*% H %*% DX %*% t(H) %*% diag(sqrt(f)) # political kernel
+
+##### Only MDS
+
+# Mixed kernel between politics and geographical distances
+# Kr = -0.5 * diag(sqrt(f)) %*% H %*% D_corr %*% t(H) %*% diag(sqrt(f))
+# Kn = -0.5 * diag(sqrt(f)) %*% H %*% Dn %*% t(H) %*% diag(sqrt(f))
+
+eigen_val <- eigen(KX)
+U <- eigen_val$vectors
+lambda <- eigen_val$values
+length(lambda[lambda>0]) # count positive lambda
+lambda <- pmax(lambda,0)
+
+# Weighted MDS
+Y = diag(1/sqrt(f)) %*% U %*% diag(sqrt(lambda))
+# Y = diag(1/rep(1/length(f), length(f))) %*% U %*% diag(sqrt(lambda)) # unweighted
+
+# 2 dimensions of MDS data frame
+mds = as.data.frame(Y[,1:2])
+mds$V1 = Re(mds$V1)
+mds$V2 = Re(mds$V2)
+mds$commune = detailed_centres_2024$NAME
+mds$langue = as.character(detailed_language_2024$language_region)
+mds$f = f
+
+# 15 bigggest cities
+mds_filtered = mds[mds$f > sort(mds$f, decreasing = TRUE)[15], ]
+
+# inertia explained in %
+propDeltaPC = round(100*lambda[1:2]/sum(lambda), digits = 1)
+
+magnif = 0.2+0.5*(log(f)-min(log(f)))/(max(log(f))-min(log(f))) # defines a magnification factor for the object weights (here from 0.5 to 2)
+xlab = paste("Factor 1, inertia explained =",propDeltaPC[1],"%")
+ylab = paste("Factor 2, inertia explained =",propDeltaPC[2],"%")
+library(ggplot2)
+library(ggtext)
+mds_plot = ggplot() +
+  geom_vline(xintercept = 0,linetype="dashed") +
+  geom_hline(yintercept = 0, linetype="dashed") +
+  # geom_point(aes(x = -mds[,1], y = -mds[,2], size=f, color=mds$langue),
+  geom_point(aes(x = -mds[,1], y = -mds[,2], color=mds$langue),
+             alpha = magnif) +
+  geom_text(aes(x = -mds_filtered[,1], y = -mds_filtered[,2], label = mds_filtered$commune)) +
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
+                     labels = c("German", "French", "Italian","Romansh")) +
+  labs(x = xlab, y = ylab) +
+  labs(size = "Reg. weight *f*", color = "Language") +
+  scale_size_continuous(range = c(1, 8)) +
+  theme_minimal() +
+  theme(legend.title = element_markdown(lineheight = 1.2))
+mds_plot
+
+# --- Unidimensional factor representation (for 1 factor MDS)
+# Plot with outlier names
+mds_outliers = mds %>%
+  group_by(langue) %>%
+  mutate(outlier = ifelse(V1 < quantile(V1, 0.25) - 1.5 * IQR(V1) |
+                            V1 > quantile(V1, 0.75) + 1.5 * IQR(V1), TRUE, FALSE))
+
+ggplot(mds_outliers, aes(x = langue, y = V1, fill = langue)) + 
+  geom_boxplot() +
+  geom_text(data = subset(mds_outliers, outlier == TRUE), 
+            aes(label = commune), 
+            size = 3, vjust = -0.5) +
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
+                    labels = c("German", "French", "Italian","Romansh")) +
+  theme_minimal() +
+  labs(x = "Language", y = "", fill = "Language") +
+  theme(legend.position = "top")
