@@ -2,8 +2,11 @@
 library(jsonlite)
 library(dplyr)
 library(sf)
+library(ggplot2)
+library(ggtext)
 
 # https://dam-api.bfs.admin.ch/hub/api/dam/assets/32588879/master
+# https://www.bfs.admin.ch/bfs/fr/home/statistiques/politique/votations/annee-2024/2024-09-22.assetdetail.32588879.html
 # Charger le fichier JSON
 file_path = "/Users/rloup/Downloads/sd-t-17-02-20240922-eidgAbstimmung.json"
 json_data = fromJSON(file_path, flatten = TRUE)
@@ -327,8 +330,8 @@ propDeltaPC = round(100*lambda[1:2]/sum(lambda), digits = 1)
 magnif = 0.2+0.5*(log(f)-min(log(f)))/(max(log(f))-min(log(f))) # defines a magnification factor for the object weights (here from 0.5 to 2)
 xlab = paste("Factor 1, inertia explained =",propDeltaPC[1],"%")
 ylab = paste("Factor 2, inertia explained =",propDeltaPC[2],"%")
-library(ggplot2)
-library(ggtext)
+
+
 mds_plot = ggplot() +
   geom_vline(xintercept = 0,linetype="dashed") +
   geom_hline(yintercept = 0, linetype="dashed") +
@@ -362,3 +365,95 @@ ggplot(mds_outliers, aes(x = langue, y = V1, fill = langue)) +
   theme_minimal() +
   labs(x = "Language", y = "", fill = "Language") +
   theme(legend.position = "top")
+
+# --- Plot raw vote results
+mds_outliers = mds %>%
+  group_by(langue) %>%
+  mutate(outlier = ifelse(V1 < quantile(V1, 0.25) - 1.5 * IQR(V1) |
+                            V1 > quantile(V1, 0.75) + 1.5 * IQR(V1), TRUE, FALSE))
+
+swiss_data_muni$language_region = detailed_language_2024$language_region
+swiss_data_muni$outlier = mds_outliers$outlier
+
+ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) + 
+  geom_boxplot() +
+  geom_text(data = subset(swiss_data_muni, outlier == TRUE),
+            aes(label = geoLevelname),
+            size = 3, vjust = -0.5) +
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
+                    labels = c("German", "French", "Italian","Romansh")) +
+  theme_minimal() +
+  labs(x = "Language", y = "", fill = "Language") +
+  geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.5) +
+  theme(legend.position = "top")
+
+# --- Regression
+# Régression pondérée
+reg_model <- lm(resultat.jaStimmenInProzent ~ as.character(language_region), data = swiss_data_muni, weights = f) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
+summary(reg_model)
+
+# Diagramme des valeurs observées vs prédites
+plot(swiss_data_muni$resultat.jaStimmenInProzent, predict(reg_model), 
+     xlab = "Valeurs observées (pourcentage de oui)", 
+     ylab = "Valeurs prédites",
+     main = "Observé vs Prédit")
+abline(0, 1, col = "red")
+
+
+# --- Commuters
+# Charger les données
+commute_data = read.csv("/Users/rloup/switchdrive/theseRomain/autocorrelation_votations/commute.csv")
+
+# Transformer les données en une matrice pivot
+commute_matrix <- reshape2::dcast(
+  commute_data, 
+  no_commune_dom ~ no_commune_trav, 
+  value.var = "pers_acti_2018", 
+  fill = 0
+)
+
+# Colonnes (basées sur no_commune_trav) et lignes (basées sur no_commune_dom)
+# Transformer le data.frame en une matrice pour plus de praticité
+rownames(commute_matrix) <- commute_matrix$no_commune_dom
+commute_matrix <- as.matrix(commute_matrix[, -1])
+# write.csv(commute_matrix, "commute_matrix.csv")
+
+# ---
+communes_mutees = read_excel("Communes_mutees_2018-2024.xlsx")
+names(communes_mutees) = communes_mutees[1,]
+communes_mutees = communes_mutees[-1,]
+names(communes_mutees) = c("no_mut", "old_canton", "old_no_district", "old_no_muni",
+                           "old_name_muni", "new_canton", "new_no_district", "new_no_muni", "new_name_muni", "date")
+# Add berner mutual voters
+communes_mutees = rbind(communes_mutees,
+                        c(9999,"BE",9999, 877, "Niedermuhlern", "BE", 9999, 888, "Wald (BE)", "2024-01-01"),
+                        c(9999,"BE",9999, 535, "Deisswil bei Münchenbuchsee", "BE", 9999, 553, "Wiggiswil", "2024-01-01"),
+                        c(9999,"BE",9999, 408, "Hellsau", "BE", 9999, 410, "Höchstetten", "2024-01-01"),
+                        c(9999,"BE",9999, 389, "Meienried", "BE", 9999, 383, "Büren an der Aare", "2024-01-01"),
+                        c(9999,"BE",9999, 629, "Oberhünigen", "BE", 9999, 628, "Zäziwil", "2024-01-01"))
+write.csv(communes_mutees, "communes_mutees_2018-2024.csv", row.names = F)
+
+# --- code aggrégation
+
+# be sure to have
+dim(commute_matrix)
+index_no = setdiff(rownames(commute_matrix), colnames(commute_matrix)) # missing column
+setdiff(colnames(commute_matrix), rownames(commute_matrix)) # missing row
+
+for (i in 1:length(index_no)) {
+  # Identifier la première colonne avec un nom plus petit que "index_no[i]"
+  col_index <- which(as.numeric(colnames(commute_matrix)) > as.numeric(index_no[i]))[1]-1
+  
+  # Ajouter une nouvelle colonne de 0 après cet index
+  commute_matrix <- cbind(
+    commute_matrix[, 1:col_index, drop = FALSE],      # Colonnes jusqu'à l'index inclus
+    index = 0,                         # Nouvelle colonne de 0
+    commute_matrix[, (col_index + 1):ncol(commute_matrix), drop = FALSE] # Colonnes restantes
+  )
+  colnames(commute_matrix)[col_index+1] = index_no[i]
+}
+
+# View(commute_matrix)
+dim(commute_matrix) # should be n x n
+
+# aggregation matrix
