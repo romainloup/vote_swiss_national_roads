@@ -6,9 +6,9 @@ library(ggplot2)
 library(ggtext)
 
 # https://dam-api.bfs.admin.ch/hub/api/dam/assets/32588879/master
-# https://www.bfs.admin.ch/bfs/fr/home/statistiques/politique/votations/annee-2024/2024-09-22.assetdetail.32588879.html
+# https://www.bfs.admin.ch/bfs/fr/home/statistiques/politique/votations/annee-2024/2024-11-24.assetdetail.33427381.html
 # Charger le fichier JSON
-file_path = "/Users/rloup/Downloads/sd-t-17-02-20240922-eidgAbstimmung.json"
+file_path = "/Users/rloup/Documents/r_projects/vote_swiss_national_roads/sd-t-17-02-20241124-eidgAbstimmung-o.json"
 json_data = fromJSON(file_path, flatten = TRUE)
 
 # Extraire les informations au niveau de la Suisse
@@ -374,6 +374,7 @@ mds_outliers = mds %>%
 
 swiss_data_muni$language_region = detailed_language_2024$language_region
 swiss_data_muni$outlier = mds_outliers$outlier
+swiss_data_muni$f = f
 
 ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) + 
   geom_boxplot() +
@@ -386,6 +387,206 @@ ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent
   labs(x = "Language", y = "", fill = "Language") +
   geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.5) +
   theme(legend.position = "top")
+
+# v2 boxplot
+library(ggrepel)
+
+ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) +
+  geom_boxplot() +
+  geom_text_repel(data = subset(swiss_data_muni, outlier == TRUE),
+                  aes(label = geoLevelname),
+                  size = 3,
+                  max.overlaps = Inf, # Garde toutes les étiquettes visibles
+                  nudge_y = 0.5, # Décale légèrement les étiquettes
+                  point.padding = 0.3, # Ajuste l'espacement autour des points
+                  box.padding = 0.4) + # Ajuste l'espacement entre les boîtes et les étiquettes
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
+                    labels = c("German", "French", "Italian", "Romansh")) +
+  theme_minimal() +
+  labs(x = "Language", y = "", fill = "Language") +
+  geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.5) +
+  theme(legend.position = "top")
+
+# V3 boxplot
+library(ggplot2)
+library(ggrepel)
+
+ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) +
+  # Boxplot avec bordures modernisées
+  geom_boxplot(alpha = 0.7, color = "black", outlier.shape = NA) +
+  # Ajout des points individuels avec jitter
+  geom_jitter(aes(color = as.character(language_region)), width = 0.2, alpha = 0.6, size = 1) +
+  # Ajout des labels pour les outliers
+  geom_text_repel(data = subset(swiss_data_muni, outlier == TRUE),
+                  aes(label = geoLevelname),
+                  size = 3,
+                  max.overlaps = Inf, # Montre toutes les étiquettes
+                  nudge_y = 2, # Légère élévation des étiquettes
+                  point.padding = 0.3,
+                  box.padding = 0.4) +
+  # Palette de couleurs personnalisée
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
+                    labels = c("German", "French", "Italian", "Romansh")) +
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
+  # Ajout d'une ligne de référence
+  geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.7) +
+  # Design moderne
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    axis.title.x = element_text(margin = margin(t = 10))
+  ) +
+  labs(
+    title = "Résultats des votes par région linguistique",
+    subtitle = "Distribution des résultats en pourcentage de votes 'oui' par langue",
+    x = "Région linguistique",
+    y = "Pourcentage de votes 'oui'",
+    fill = "Langue"
+  )
+
+# V4 boxplot
+library(ggplot2)
+library(ggrepel)
+
+ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) +
+  # Boxplot modernisé
+  # geom_boxplot(alpha = 0.7, color = "black", outlier.shape = NA) +
+  # Ajout des points individuels, taille proportionnelle à la taille de la commune
+  geom_jitter(aes(color = as.character(language_region), size = f), 
+              width = 0.2, alpha = 0.6) +
+  # Ajout des labels pour les outliers
+  geom_text_repel(data = subset(swiss_data_muni, outlier == TRUE),
+                  aes(label = geoLevelname),
+                  size = 3,
+                  max.overlaps = Inf, # Montre toutes les étiquettes
+                  nudge_y = 2, # Légère élévation des étiquettes
+                  point.padding = 0.3,
+                  box.padding = 0.4) +
+  # Palette de couleurs personnalisée
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
+                    labels = c("German", "French", "Italian", "Romansh")) +
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
+  # Palette pour la taille des points
+  scale_size_continuous(range = c(1, 8), name = "Taille des communes") +
+  # Ajout d'une ligne de référence
+  geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.7) +
+  # Design moderne
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    axis.title.x = element_text(margin = margin(t = 10))
+  ) +
+  labs(
+    title = "Résultats des votes par région linguistique",
+    subtitle = "Distribution des résultats en pourcentage de votes 'oui' par langue, taille proportionnelle à la taille des communes",
+    x = "Région linguistique",
+    y = "Pourcentage de votes 'oui'",
+    fill = "Langue"
+  )
+
+# V5
+library(ggplot2)
+library(ggrepel)
+
+ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) +
+  # Boxplot modernisé
+  # geom_boxplot(alpha = 0.7, color = "black", outlier.shape = NA) +
+  # Points individuels avec jitter et taille proportionnelle à 'f'
+  geom_jitter(aes(color = as.character(language_region), size = f), 
+              width = 0.2, alpha = 0.6) +
+  # Labels pour les outliers avec alignement précis
+  geom_text_repel(
+    data = subset(swiss_data_muni, outlier == TRUE),
+    aes(label = geoLevelname, size = NULL), # Ignore 'size' pour éviter conflit
+    size = 3,
+    nudge_y = 2, # Légère élévation des labels
+    point.padding = 0.3,
+    box.padding = 0.4,
+    segment.color = "gray50", # Couleur des lignes
+    segment.size = 0.5, # Taille des segments
+    max.overlaps = Inf
+  ) +
+  # Palette de couleurs pour le remplissage
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
+                    labels = c("German", "French", "Italian", "Romansh")) +
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
+  # Échelle pour la taille des points
+  scale_size_continuous(name = "Taille de la commune", range = c(1, 10)) +
+  # Ligne de référence
+  geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.7) +
+  # Design moderne
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    axis.title.x = element_text(margin = margin(t = 10))
+  ) +
+  labs(
+    title = "Résultats des votes par région linguistique",
+    subtitle = "Distribution des résultats en pourcentage de votes 'oui' par langue, pondérés par la taille des communes",
+    x = "Région linguistique",
+    y = "Pourcentage de votes 'oui'",
+    fill = "Langue"
+  )
+
+# V6
+library(ggplot2)
+library(ggrepel)
+library(dplyr)
+
+# Ajouter les coordonnées jitterées dans les données pour un alignement parfait
+swiss_data_muni <- swiss_data_muni %>%
+  mutate(jitter_x = jitter(as.numeric(language_region), amount = 0.2), # Jitter pour l'axe X
+         jitter_y = resultat.jaStimmenInProzent) # Les valeurs Y restent identiques
+
+ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) +
+  # Boxplot modernisé
+  geom_boxplot(alpha = 0.7, color = "black", outlier.shape = NA) +
+  # Points individuels avec jitter et taille proportionnelle à 'f'
+  geom_point(data = swiss_data_muni,
+             aes(x = jitter_x, y = jitter_y, color = as.character(language_region), size = f), 
+             alpha = 0.6) +
+  # Labels pour les outliers alignés avec les points jitterés
+  geom_text_repel(
+    data = subset(swiss_data_muni, outlier == TRUE),
+    aes(x = jitter_x, y = jitter_y, label = geoLevelname),
+    size = 3,
+    nudge_y = 2, # Légère élévation des labels
+    point.padding = 0.3,
+    box.padding = 0.4,
+    segment.color = "gray50", # Couleur des lignes
+    segment.size = 0.5, # Taille des segments
+    max.overlaps = Inf
+  ) +
+  # Palette de couleurs pour le remplissage
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
+                    labels = c("German", "French", "Italian", "Romansh")) +
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
+  # Échelle pour la taille des points
+  scale_size_continuous(name = "Taille de la commune", range = c(1, 10)) +
+  # Ligne de référence
+  geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.7) +
+  # Design moderne
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    axis.title.x = element_text(margin = margin(t = 10))
+  ) +
+  labs(
+    title = "Résultats des votes par région linguistique",
+    subtitle = "Distribution des résultats en pourcentage de votes 'oui' par langue, pondérés par la taille des communes",
+    x = "Région linguistique",
+    y = "Pourcentage de votes 'oui'",
+    fill = "Langue"
+  )
+
 
 # --- Regression
 # Régression pondérée
