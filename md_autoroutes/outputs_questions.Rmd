@@ -1,0 +1,224 @@
+---
+title: "questions_autoroutes"
+author: "Romain Loup"
+date: "2024-12-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Votations 24 novembre "routes nationales"
+
+## *Objectif* : expliquer la géographie de refus à l’extension de 6 projets autoroutiers
+
+### Contexte :
+
+-	Débats sur la transition mobilitaire, remise en question de l’automobilité, etc.
+-	Intérêt d’une votation à l’échelle nationale pour analyser le soutien/l’opposition à l’extension du réseau autoroutier
+
+### Étape I : carte descriptive
+
+A faire : inverser oui/non
+
+Choroplète
+```{r pressure, echo=FALSE}
+leaflet(ch_aggregated) %>%
+  # addProviderTiles(providers$CartoDB.Positron) %>%
+  addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView( lat=46.637785, lng=8.2 , zoom=7) %>%
+  # municipality polygons
+  addPolygons(
+    fillColor = palDiv(yes$X6730),
+    fillOpacity = 0.9,
+    color = "white",
+    weight = 0.1,
+    opacity = 1,
+    highlight = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.7,
+      bringToFront = TRUE,
+      sendToBack = TRUE),
+    label = paste0(ch_aggregated$NAME, ": ", round(yes[,46], 2), "%"),
+    smoothFactor = 0.2,
+    # group = "MDS fac. 1",
+  ) %>%
+  addPolygons(data = lakes,
+              weight = 0.7,
+              fillColor = "#dddddd",
+              fillOpacity = 1,
+              color = "white",
+              highlight = highlightOptions(
+                weight = 1,
+                color = "#666",
+                fillOpacity = 1,
+                bringToFront = TRUE),
+              label = lakes$NAME,
+              labelOptions = labelOptions(
+                style = list(
+                  "color" = "#666",
+                  "font-style" = "italic"
+                )),
+              smoothFactor = 0.2,
+              group = c("lakes")) %>%
+  addLayersControl(
+    # baseGroups = c("MDS fac. 1","MDS fac. 2"), # groups separated by municipality
+    overlayGroups = c("lakes"),
+    options = layersControlOptions(collapsed = TRUE)
+  ) %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
+  # Ajout de la légende
+  addLegend(
+    pal = palDiv,
+    values = swiss_data_muni$resultat.jaStimmenInProzent,
+    position = "bottomright",
+    title = "Oui (%)",
+    labFormat = labelFormat(suffix = "%"),
+    opacity = 0.9
+  )
+```
+
+
+```{r pressure, echo=FALSE}
+communes_centres
+# leaflet(ch_aggregated) %>%
+#   # addProviderTiles(providers$CartoDB.Positron) %>%
+#   addProviderTiles(providers$CartoDB.DarkMatter) %>%
+#   setView(lat = 46.637785, lng = 8.2, zoom = 7) %>%
+#   # Ajout des lacs
+#   addPolygons(
+#     data = lakes,
+#     weight = 0.7,
+#     fillColor = "#dddddd",
+#     fillOpacity = 1,
+#     color = "white",
+#     highlight = highlightOptions(
+#       weight = 1,
+#       color = "#666",
+#       fillOpacity = 1,
+#       bringToFront = TRUE
+#     ),
+#     label = lakes$NAME,
+#     labelOptions = labelOptions(
+#       style = list(
+#         "color" = "#666",
+#         "font-style" = "italic"
+#       )
+#     ),
+#     smoothFactor = 0.2,
+#     group = c("lakes")
+#   ) %>%
+#   # Add proportional symbols
+#   addCircles(
+#     lng = ~communes_centres$longitude,
+#     lat = ~communes_centres$latitude,
+#     weight = 1,        # Bordure des cercles
+#     # radius = ~yes[,46] * 5000,  # Ajustez le multiplicateur pour l'échelle des cercles
+#     radius = ~f^0.57 * 100000,  # Ajustez le multiplicateur pour l'échelle des cercles
+# 
+#     color = "white",   # Couleur de la bordure
+#     fillColor = ~palDiv(yes$X6730),  # Couleur des cercles proportionnelle aux valeurs
+# 
+#     fillOpacity = 0.9,
+#     label = ~paste0(NAME, ": ", round(yes[,46], 2), "%"),  # Infobulle
+#     highlightOptions = highlightOptions(
+#       weight = 2,
+#       color = "#666",
+#       fillOpacity = 0.7,
+#       bringToFront = TRUE
+#     )
+#   ) %>%
+#   addLayersControl(
+#     overlayGroups = c("lakes"),
+#     options = layersControlOptions(collapsed = TRUE)
+#   ) %>%
+#   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE)) %>%
+#   # Ajout de la légende
+#   addLegend(
+#     pal = palDiv,
+#     values = swiss_data_muni$resultat.jaStimmenInProzent,
+#     position = "bottomright",
+#     title = "Oui (%)",
+#     labFormat = labelFormat(suffix = "%"),
+#     opacity = 0.9
+#   )
+
+# v2
+
+# Trier les données par rayon (décroissant)
+dataSetCircles = communes_centres
+dataSetCircles$f = f
+dataSetCircles$vote = yes$X6730
+dataSetCircles = dataSetCircles[order(-f^0.57), ]
+
+leaflet(ch_aggregated) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  # addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView(lat = 46.637785, lng = 8.2, zoom = 7) %>%
+  # Ajout des lacs
+  addPolygons(
+    data = lakes,
+    weight = 0.7,
+    fillColor = "#dddddd",
+    fillOpacity = 1,
+    color = "white",
+    highlight = highlightOptions(
+      weight = 1,
+      color = "#666",
+      fillOpacity = 1,
+      bringToFront = TRUE
+    ),
+    label = lakes$NAME,
+    labelOptions = labelOptions(
+      style = list(
+        "color" = "#666",
+        "font-style" = "italic"
+      )
+    ),
+    smoothFactor = 0.2,
+    group = c("lakes")
+  ) %>%
+  # Ajout des cercles proportionnels
+  addCircles(
+    lng = ~longitude,
+    lat = ~latitude,
+    data = dataSetCircles,  # Utilisation des données triées
+    weight = 1,                      # Bordure des cercles
+    radius = ~f^0.57 * 100000,       # Ajustez le multiplicateur pour l'échelle des cercles
+    color = "white",                 # Couleur de la bordure
+    fillColor = ~palDiv(vote),  # Couleur des cercles proportionnelle aux valeurs
+    fillOpacity = 0.9,
+    label = ~paste0(NAME, ": ", round(100*vote, 2), "%"),  # Infobulle
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.7,
+      bringToFront = TRUE
+    )
+  ) %>%
+  addLayersControl(
+    overlayGroups = c("lakes"),
+    options = layersControlOptions(collapsed = TRUE)
+  ) %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE)) %>%
+  # Ajout de la légende
+  addLegend(
+    pal = palDiv,
+    values = dataSetCircles$vote,
+    position = "bottomright",
+    title = "Oui (%)",
+    labFormat = labelFormat(suffix = "%"),
+    opacity = 0.9
+  )
+
+```
+
+### Étape II : modèle
+
+Comment expliquer la variation du % de non entre les communes ?
+
+```{r pressure, echo=FALSE}
+
+```
