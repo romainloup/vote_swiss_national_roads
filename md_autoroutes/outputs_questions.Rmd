@@ -24,13 +24,19 @@ A faire : inverser oui/non
 
 Choroplète
 ```{r pressure, echo=FALSE}
+# Palette de couleurs PRGn ajustée
+my_palette <- colorNumeric(
+  palette = colorRampPalette(c("#af8dc3", "#7fbf7b"))(100), # Transition douce entre violet et vert
+  domain = NULL
+)
+palDiv = colorNumeric("PRGn", NULL) # color palette
 leaflet(ch_aggregated) %>%
   # addProviderTiles(providers$CartoDB.Positron) %>%
   addProviderTiles(providers$CartoDB.DarkMatter) %>%
   setView( lat=46.637785, lng=8.2 , zoom=7) %>%
   # municipality polygons
   addPolygons(
-    fillColor = palDiv(yes$X6730),
+    fillColor = my_palette(yes$X6730),
     fillOpacity = 0.9,
     color = "white",
     weight = 0.1,
@@ -71,7 +77,7 @@ leaflet(ch_aggregated) %>%
   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
   # Ajout de la légende
   addLegend(
-    pal = palDiv,
+    pal = my_palette,
     values = swiss_data_muni$resultat.jaStimmenInProzent,
     position = "bottomright",
     title = "Oui (%)",
@@ -188,8 +194,8 @@ leaflet(ch_aggregated) %>%
     weight = 1,                      # Bordure des cercles
     radius = ~f^0.57 * 100000,       # Ajustez le multiplicateur pour l'échelle des cercles
     color = "white",                 # Couleur de la bordure
-    fillColor = ~palDiv(vote),  # Couleur des cercles proportionnelle aux valeurs
-    fillOpacity = 0.9,
+    fillColor = ~my_palette(vote),  # Couleur des cercles proportionnelle aux valeurs
+    fillOpacity = 0.95,
     label = ~paste0(NAME, ": ", round(100*vote, 2), "%"),  # Infobulle
     highlightOptions = highlightOptions(
       weight = 2,
@@ -205,7 +211,7 @@ leaflet(ch_aggregated) %>%
   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE)) %>%
   # Ajout de la légende
   addLegend(
-    pal = palDiv,
+    pal = my_palette,
     values = dataSetCircles$vote,
     position = "bottomright",
     title = "Oui (%)",
@@ -220,5 +226,225 @@ leaflet(ch_aggregated) %>%
 Comment expliquer la variation du % de non entre les communes ?
 
 ```{r pressure, echo=FALSE}
+# --- Regression
+# Régression pondérée 2ers facteurs MDS sur toutes les votations
+reg_model = lm(resultat.jaStimmenInProzent ~ mds$V1 + mds$V2, data = swiss_data_muni, weights = f) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
+summary(reg_model)
+# Résidus
+residu_road = swiss_data_muni$resultat.jaStimmenInProzent - predict(reg_model)
+
+leaflet(ch_aggregated) %>%
+  # addProviderTiles(providers$CartoDB.Positron) %>%
+  addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView( lat=46.637785, lng=8.2 , zoom=7) %>%
+  # municipality polygons
+  addPolygons(
+    fillColor = palDiv(residu_road),
+    fillOpacity = 0.9,
+    color = "white",
+    weight = 0.1,
+    opacity = 1,
+    highlight = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.7,
+      bringToFront = TRUE,
+      sendToBack = TRUE),
+    label = paste0(ch_aggregated$NAME, ": ", round(residu_road, 2)),
+    smoothFactor = 0.2,
+    # group = "MDS fac. 1",
+  ) %>%
+  addPolygons(data = lakes,
+              weight = 0.7,
+              fillColor = "#dddddd",
+              fillOpacity = 1,
+              color = "white",
+              highlight = highlightOptions(
+                weight = 1,
+                color = "#666",
+                fillOpacity = 1,
+                bringToFront = TRUE),
+              label = lakes$NAME,
+              labelOptions = labelOptions(
+                style = list(
+                  "color" = "#666",
+                  "font-style" = "italic"
+                )),
+              smoothFactor = 0.2,
+              group = c("lakes")) %>%
+  addLayersControl(
+    # baseGroups = c("MDS fac. 1","MDS fac. 2"), # groups separated by municipality
+    overlayGroups = c("lakes"),
+    options = layersControlOptions(collapsed = TRUE)
+  ) %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
+  # Ajout de la légende
+  addLegend(
+    pal = palDiv,
+    values = swiss_data_muni$resultat.jaStimmenInProzent,
+    position = "bottomright",
+    title = "Résidus",
+    labFormat = labelFormat(suffix = "%"),
+    opacity = 0.9
+  )
+```
+
+Les communes proches des 6 tronçons prévus ont-elles voté plus oui ou non ? (plus de oui ou de non qu’attendus ?)
+```{r pressure, echo=FALSE}
+# Résidus des communes directement concernée
+resid_communes_direct = residu_road[which(ch_aggregated$road_project_n == 1)]
+mean(resid_communes_direct)
+# Tester si la moyenne est égale à 0
+t.test(resid_communes_direct, mu = 0)
+
+# Résidus des communes directement concernée
+resid_communes_voisins = residu_road[which(ch_aggregated$road_project_n == 2)]
+mean(resid_communes_voisins)
+# Tester si la moyenne est égale à 0
+t.test(resid_communes_voisins, mu = 0)
+
+# Résidus des communes directement concernée
+resid_communes_voisins1 = residu_road[which(ch_aggregated$road_project_n == 3)]
+mean(resid_communes_voisins1)
+# Tester si la moyenne est égale à 0
+t.test(resid_communes_voisins1, mu = 0)
+
+
+# tests pondérés
+# Moyenne pondérée
+data_test = resid_communes_direct
+weights_test = f[which(ch_aggregated$road_project_n == 1)]
+weighted_mean <- sum(weights_test * data_test) / sum(weights_test)
+mu0 = 0
+
+# Variance pondérée
+variance_weighted <- sum(weights_test * (data_test - weighted_mean)^2) / sum(weights_test)
+
+# Nombre effectif
+n_effective <- n*f
+
+# Erreur standard pondérée
+se_weighted <- sqrt(variance_weighted / n_effective)
+
+# Statistique t
+t_stat <- (weighted_mean - mu0) / se_weighted
+
+# p-value
+p_value <- 2 * pt(-abs(t_stat), df = n_effective - 1)
+
+# Résultats
+cat("Moyenne pondérée :", weighted_mean, "\n")
+cat("Statistique t :", t_stat, "\n")
+cat("p-value :", p_value, "\n")
+
+n_effective <- n*f
+reg_projets = lm(residu_road ~ as.factor(ch_aggregated$road_project), weights = n_effective)
+summary(reg_projets)
+
+anova(reg_projets)
+```
+Corréations
+```{r pressure, echo=FALSE}
+
+
+library(FactoMineR)
+PCA_yes = PCA(X = yes[,3:383], row.w = f)
+
+
+X <- (yes[,3:383])
+# Étape 1 : Normaliser les poids pour qu'ils somme à 1
+f
+
+# Étape 2 : Calculer les moyennes pondérées pour chaque colonne
+means <- colSums(as.matrix(yes[,3:383]) * f)
+
+# Étape 3 : Centrer les données
+yes_centered <- sweep(as.matrix(yes[,3:383]), 2, means)
+
+# Étape 4 : Calculer les écarts-types pondérés pour chaque colonne
+std_dev <- sqrt(colSums((yes_centered^2) * f))
+
+# Étape 5 : Réduire les données
+yes_scaled <- sweep(yes_centered, 2, std_dev, "/")
+
+# Étape 6 : Calculer la matrice de covariance pondérée
+cov_weighted <- t(yes_scaled) %*% (yes_scaled * f)
+
+# Étape 7 : Transformer en matrice de corrélation (déjà normalisée)
+corr_weighted <- cov_weighted
+
+# Résultat : Matrice de corrélation pondérée 381 x 381
+print(dim(corr_weighted))  # Vérifie les dimensions (381 x 381)
+View(corr_weighted)
+
+```
+
+Extraire les 50 corrélations les plus fortes
+```{r pressure, echo=FALSE}
+# Étape 1 : Mettre la diagonale à NA (pour l'exclure)
+diag(corr_weighted) <- NA
+
+# Étape 2 : Convertir la matrice en un data frame long
+library(reshape2) # Utilisé pour melt
+corr_long <- melt(corr_weighted, varnames = c("Variable1", "Variable2"), value.name = "Correlation")
+
+# Étape 3 : Filtrer pour exclure les NA et trier par la valeur absolue de la corrélation
+corr_long <- corr_long[!is.na(corr_long$Correlation), ]
+corr_long <- corr_long[order(-abs(corr_long$Correlation)), ]
+
+# Étape 4 : Sélectionner les 50 corrélations les plus fortes
+top_50_corr <- head(corr_long, 50)
+
+# Résultat
+View(top_50_corr)
+```
+
+Extraire les nb_votes corrélations les plus fortes avec le vote routes nationales
+```{r pressure, echo=FALSE}
+# Fonction pour obtenir les 50 noms les plus corrélés avec une variable donnée
+nb_votes = dim(corr_weighted)[1]
+
+get_top_correlations <- function(corr_matrix, target_variable, top_n = nb_votes-1) {
+  # Extraire la colonne correspondant à la variable cible
+  correlations <- corr_matrix[, target_variable]
+  
+  # Exclure la variable cible elle-même
+  correlations[target_variable] <- NA
+  
+  # Trier les corrélations par leur valeur absolue
+  sorted_indices <- order(-abs(correlations), na.last = NA)
+  
+  # Sélectionner les top_n variables
+  top_variables <- rownames(corr_matrix)[sorted_indices[1:top_n]]
+  top_values <- correlations[sorted_indices[1:top_n]]
+  
+  # Retourner un data frame avec les noms et les valeurs des corrélations
+  data.frame(Variable = top_variables, Correlation = top_values)
+}
+
+# Exemple d'utilisation
+# Supposons que vous voulez les 50 noms les plus corrélés avec "Var1"
+target_variable <- "X6730"  # Nom de la variable cible
+top_100_correlations <- get_top_correlations(corr_weighted, target_variable)
+
+# Résultat
+View(top_100_correlations)
+
+
+
+
+
+# Supposons que `top_100_correlations` contient la première colonne avec les codes "X----"
+# Et `other_table` contient une colonne `Code` avec les 4 chiffres correspondants
+
+# Étape 1 : Extraire les 4 chiffres du code "X----"
+top_100_correlations$vote_id <- sub("X", "", top_100_correlations$Variable)
+
+# Étape 2 : Joindre avec l'autre tableau
+# Supposons que `other_table` contient une colonne "Code" et d'autres informations
+merged_table <- merge(top_100_correlations, voteInfo, by = "vote_id", all.x = TRUE)
+
+# Résultat
+View(merged_table)
 
 ```

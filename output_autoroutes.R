@@ -239,7 +239,7 @@ ch_aggregated$road_project_direct = ch_aggregated$road_project
 
 # 2. Identifier les polygones voisins des intersections
 # Trouver les indices des polygones avec une intersection
-intersecting_indices <- which(ch_aggregated$road_project == 1)
+intersecting_indices <- which(ch_aggregated$road_project_direct == 1)
 
 # Trouver les voisins de tous les polygones
 neighbors <- st_touches(ch_aggregated, sparse = TRUE)
@@ -248,18 +248,36 @@ neighbors <- st_touches(ch_aggregated, sparse = TRUE)
 neighboring_indices <- unique(unlist(neighbors[intersecting_indices]))
 
 # Ajouter une colonne pour voisins des intersections (2) et intersections (1)
-ch_aggregated$road_project <- ifelse(
-  ch_aggregated$road_project == 1,  # Si c'est une intersection
+ch_aggregated$road_project_n1 <- ifelse(
+  ch_aggregated$road_project_direct == 1,  # Si c'est une intersection
   1,                                # Attribuer 1
   ifelse(seq_len(nrow(ch_aggregated)) %in% neighboring_indices, 2, 0) # Sinon vérifier si voisin
 )
 
-# # Ajouter une colonne pour voisins des intersections (2) et intersections (1) (voisins des voisins)
-# ch_aggregated$road_project_2 <- ifelse(
-#   ch_aggregated$road_project_2 == 1,  # Si c'est une intersection
-#   1,                                # Attribuer 1
-#   ifelse(seq_len(nrow(ch_aggregated)) %in% neighboring_indices, 2, 0) # Sinon vérifier si voisin
-# )
+### voisin des voisins etc
+
+library(sf)
+
+# Initialiser la colonne avec des 0
+ch_aggregated$road_project_n <- 0
+
+# Étape 1 : Attribuer 1 aux intersections directes
+intersecting_indices <- which(ch_aggregated$road_project_direct == 1)
+ch_aggregated$road_project_n[intersecting_indices] <- 1
+
+# Étape 2 : Trouver les voisins directs (niveau 2)
+neighbors <- st_touches(ch_aggregated, sparse = TRUE)
+neighboring_indices <- unique(unlist(neighbors[intersecting_indices]))
+neighboring_indices <- neighboring_indices[ch_aggregated$road_project_n[neighboring_indices] == 0] # Exclure les déjà marqués
+ch_aggregated$road_project_n[neighboring_indices] <- 2
+
+# Étape 3 : Trouver les voisins des voisins (niveau 3)
+neighbors_of_neighbors <- unique(unlist(neighbors[neighboring_indices]))
+neighbors_of_neighbors <- neighbors_of_neighbors[ch_aggregated$road_project_n[neighbors_of_neighbors] == 0] # Exclure les déjà marqués
+ch_aggregated$road_project_n[neighbors_of_neighbors] <- 3
+
+View(ch_aggregated)
+
 
 
 # --- Regression
