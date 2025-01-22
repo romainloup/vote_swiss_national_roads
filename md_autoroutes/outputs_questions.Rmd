@@ -15,18 +15,23 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Contexte :
 
--	Débats sur la transition mobilitaire, remise en question de l’automobilité, etc.
--	Intérêt d’une votation à l’échelle nationale pour analyser le soutien/l’opposition à l’extension du réseau autoroutier
+-   Débats sur la transition mobilitaire, remise en question de l’automobilité, etc.
+-   Intérêt d’une votation à l’échelle nationale pour analyser le soutien/l’opposition à l’extension du réseau autoroutier
 
 ### Étape I : carte descriptive
 
 A faire : inverser oui/non
 
 Choroplète
+
 ```{r pressure, echo=FALSE}
 # Palette de couleurs PRGn ajustée
 my_palette <- colorNumeric(
   palette = colorRampPalette(c("#af8dc3", "#7fbf7b"))(100), # Transition douce entre violet et vert
+  domain = NULL
+)
+rev_my_palette = colorNumeric(
+  palette = colorRampPalette(c("#7fbf7b", "#af8dc3"))(100), # Transition douce entre vert et violet
   domain = NULL
 )
 palDiv = colorNumeric("PRGn", NULL) # color palette
@@ -85,7 +90,6 @@ leaflet(ch_aggregated) %>%
     opacity = 0.9
   )
 ```
-
 
 ```{r pressure, echo=FALSE}
 communes_centres
@@ -211,11 +215,12 @@ leaflet(ch_aggregated) %>%
   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE)) %>%
   # Ajout de la légende
   addLegend(
-    pal = my_palette,
-    values = dataSetCircles$vote,
+    pal = rev_my_palette,
+    values = round(100*dataSetCircles$vote, 2),
     position = "bottomright",
     title = "Oui (%)",
-    labFormat = labelFormat(suffix = "%"),
+    # labFormat = labelFormat(suffix = "%"),
+    labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
     opacity = 0.9
   )
 
@@ -226,20 +231,71 @@ leaflet(ch_aggregated) %>%
 Comment expliquer la variation du % de non entre les communes ?
 
 ```{r pressure, echo=FALSE}
+# Boxplot pondéré
+
+```
+
+```{r pressure, echo=FALSE}
+my_palette <- colorNumeric(
+  palette = colorRampPalette(c("#af8dc3", "#7fbf7b"))(100), # Transition douce entre violet et vert
+  domain = NULL
+)
+my_palette = scale_color_brewer(n = 11, palette = "PRGn")
+
+rev_my_palette = colorNumeric(
+  palette = colorRampPalette(c("#7fbf7b", "#af8dc3"))(100), # Transition douce entre vert et violet
+  domain = NULL
+)
 # --- Regression
 # Régression pondérée 2ers facteurs MDS sur toutes les votations
 reg_model = lm(resultat.jaStimmenInProzent ~ mds$V1 + mds$V2, data = swiss_data_muni, weights = f) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
 summary(reg_model)
 # Résidus
 residu_road = swiss_data_muni$resultat.jaStimmenInProzent - predict(reg_model)
+ch_aggregated$residu_road = residu_road
+
+autoroutes = st_read("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/autoroutes.shp") # CRS: CH1903+
+autoroutes = st_transform(autoroutes, crs = 4326)
+autoroutes = st_zm(autoroutes, drop = T, what = "ZM") # delete Z for Leaflet
+
+projets_2024 = st_read("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/troncons/projets_2024.shp") # CRS: CH1903+
+projets_2024 = st_transform(projets_2024, crs = 4326)
+projets_2024 = st_zm(projets_2024, drop = T, what = "ZM") # delete Z for Leaflet
+
+centre_entrees = st_read("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/troncons/centre_entrees_corr.shp") # CRS: CH1903+
+centre_entrees = st_transform(centre_entrees, crs = 4326)
+centre_entrees = st_zm(centre_entrees, drop = T, what = "ZM") # delete Z for Leaflet
+
+centre_entrees = st_zm(
+  st_transform(
+    st_read("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/troncons/centre_entrees_corr.shp"),
+    crs = 4326
+  ),
+  drop = TRUE,
+  what = "ZM"
+)
+
+# Calcul des distances minimales
+ch_aggregated$min_distance_to_highway <- st_distance(
+  ch_aggregated,
+  centre_entrees
+) %>%
+  apply(1, min) # Trouve la distance minimale pour chaque polygone
+
+maxData = residu_road[which.max( abs(residu_road) )]
+
+scale_range <- c(-maxData, maxData)
+palDiv0 <- colorNumeric("PRGn", domain = scale_range)
+rev_palDiv0 <- colorNumeric("PRGn", domain = scale_range, reverse = TRUE)
+
 
 leaflet(ch_aggregated) %>%
-  # addProviderTiles(providers$CartoDB.Positron) %>%
-  addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  # addProviderTiles(providers$CartoDB.DarkMatter) %>%
   setView( lat=46.637785, lng=8.2 , zoom=7) %>%
   # municipality polygons
   addPolygons(
-    fillColor = palDiv(residu_road),
+    fillColor = ~palDiv0(residu_road),
     fillOpacity = 0.9,
     color = "white",
     weight = 0.1,
@@ -253,6 +309,20 @@ leaflet(ch_aggregated) %>%
     label = paste0(ch_aggregated$NAME, ": ", round(residu_road, 2)),
     smoothFactor = 0.2,
     # group = "MDS fac. 1",
+  ) %>%
+  addPolylines(
+    data = autoroutes,       # Fournissez ici un objet avec les autoroutes
+    color = "#d47c17",          # Couleur des lignes
+    weight = 1,              # Épaisseur des lignes
+    opacity = 0.8,           # Opacité des lignes
+    label = autoroutes$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolylines(
+    data = projets_2024,       # Fournissez ici un objet avec les autoroutes
+    color = "#d44317",          # Couleur des lignes
+    weight = 3,              # Épaisseur des lignes
+    opacity = 0.9,           # Opacité des lignes
+    label = projets_2024$NAME  # Optionnel : ajoute un label si disponible
   ) %>%
   addPolygons(data = lakes,
               weight = 0.7,
@@ -278,18 +348,27 @@ leaflet(ch_aggregated) %>%
     options = layersControlOptions(collapsed = TRUE)
   ) %>%
   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
+  addLegend(
+    colors = c("#d47c17", "#d44317"),
+    position = "bottomright",
+    labels = c("Highways", "Voted projects"),
+    opacity = 0.9
+  ) %>%
   # Ajout de la légende
   addLegend(
-    pal = palDiv,
-    values = swiss_data_muni$resultat.jaStimmenInProzent,
+    pal = rev_palDiv0,
+    values = residu_road,
     position = "bottomright",
     title = "Résidus",
-    labFormat = labelFormat(suffix = "%"),
+    # labFormat = labelFormat(suffix = "%"),
+    labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
+
     opacity = 0.9
   )
 ```
 
 Les communes proches des 6 tronçons prévus ont-elles voté plus oui ou non ? (plus de oui ou de non qu’attendus ?)
+
 ```{r pressure, echo=FALSE}
 # Résidus des communes directement concernée
 resid_communes_direct = residu_road[which(ch_aggregated$road_project_n == 1)]
@@ -297,17 +376,108 @@ mean(resid_communes_direct)
 # Tester si la moyenne est égale à 0
 t.test(resid_communes_direct, mu = 0)
 
-# Résidus des communes directement concernée
+# Résidus des communes directement concernée + voisines
 resid_communes_voisins = residu_road[which(ch_aggregated$road_project_n == 2)]
 mean(resid_communes_voisins)
 # Tester si la moyenne est égale à 0
 t.test(resid_communes_voisins, mu = 0)
 
-# Résidus des communes directement concernée
+# Résidus des communes directement concernée + voisines + voisines des voisines
 resid_communes_voisins1 = residu_road[which(ch_aggregated$road_project_n == 3)]
 mean(resid_communes_voisins1)
 # Tester si la moyenne est égale à 0
 t.test(resid_communes_voisins1, mu = 0)
+
+# --- Par projet
+# 1, 2 : Bern
+resid_projet_indiv_1 = residu_road[which(ch_aggregated$road_project_indiv == 1)]
+mean(resid_projet_indiv_1)# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_1, mu = 0)
+
+# 2 : Geneva
+resid_projet_indiv_2 = residu_road[which(ch_aggregated$road_project_indiv == 2)]
+mean(resid_projet_indiv_2)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_2, mu = 0)
+
+# 3 : St. Gallen
+resid_projet_indiv_3 = residu_road[which(ch_aggregated$road_project_indiv == 3)]
+mean(resid_projet_indiv_3)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_3, mu = 0)
+
+# 4 : Schaffhausen
+resid_projet_indiv_4 = residu_road[which(ch_aggregated$road_project_indiv == 4)]
+mean(resid_projet_indiv_4)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_4, mu = 0)
+
+# 5 : Basel
+resid_projet_indiv_5 = residu_road[which(ch_aggregated$road_project_indiv == 5)]
+mean(resid_projet_indiv_5)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_5, mu = 0)
+
+# --- Par projet, voisins
+# 1, 2 : Bern
+resid_projet_indiv_n1 = residu_road[which(ch_aggregated$road_project_indiv_n == 1)]
+mean(resid_projet_indiv_n1) # Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_n1, mu = 0)
+
+# 2 : Geneva
+resid_projet_indiv_n2 = residu_road[which(ch_aggregated$road_project_indiv_n == 2)]
+mean(resid_projet_indiv_n2)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_n2, mu = 0)
+
+# 3 : St. Gallen
+resid_projet_indiv_n3 = residu_road[which(ch_aggregated$road_project_indiv_n == 3)]
+mean(resid_projet_indiv_n3)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_n3, mu = 0)
+
+# 4 : Schaffhausen
+resid_projet_indiv_n4 = residu_road[which(ch_aggregated$road_project_indiv_n == 4)]
+mean(resid_projet_indiv_n4)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_n4, mu = 0)
+
+# 5 : Basel
+resid_projet_indiv_n5 = residu_road[which(ch_aggregated$road_project_indiv_n == 5)]
+mean(resid_projet_indiv_n5)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_n5, mu = 0)
+
+# --- Par projet, voisins des voisins
+# 1, 2 : Bern
+resid_projet_indiv_nn1 = residu_road[which(ch_aggregated$road_project_indiv_n2 == 1)]
+mean(resid_projet_indiv_nn1) # Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_nn1, mu = 0)
+
+# 2 : Geneva
+resid_projet_indiv_nn2 = residu_road[which(ch_aggregated$road_project_indiv_n2 == 2)]
+mean(resid_projet_indiv_nn2)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_nn2, mu = 0)
+
+# 3 : St. Gallen
+resid_projet_indiv_nn3 = residu_road[which(ch_aggregated$road_project_indiv_n2 == 3)]
+mean(resid_projet_indiv_nn3)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_nn3, mu = 0)
+
+# 4 : Schaffhausen
+resid_projet_indiv_nn4 = residu_road[which(ch_aggregated$road_project_indiv_n2 == 4)]
+mean(resid_projet_indiv_nn4)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_nn4, mu = 0)
+
+# 5 : Basel
+resid_projet_indiv_nn5 = residu_road[which(ch_aggregated$road_project_indiv_n2 == 5)]
+mean(resid_projet_indiv_nn5)
+# Tester si la moyenne est égale à 0
+t.test(resid_projet_indiv_nn5, mu = 0)
+
 
 
 # tests pondérés
@@ -343,7 +513,251 @@ summary(reg_projets)
 
 anova(reg_projets)
 ```
+Communes proche entrées/sorties autoroute
+moins de 10', plus de 20 ou plus de 40
+```{r pressure, echo=FALSE}
+
+road_time = 90
+# less than x min
+t.test(residu_road[which(min_time_to_highway$t_min < road_time*60)], mu = 0)
+# more than x min
+t.test(residu_road[which(min_time_to_highway$t_min > road_time*60)], mu = 0)
+```
+Geolevels OFS
+
+Typologie urbain-rural
+- 1 Urbain
+- 2 Intermédiaire (périurbain dense et centres ruraux)
+- 3 Rural
+
+```{r pressure, echo=FALSE}
+# Loading
+library("readxl")
+# xls files
+geoLevels = read_excel("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/Niveaux_géographiques_2024.xlsx", skip = 1)
+geoLevels = geoLevels[-1,]
+
+# Delete 5 Bern municipalities 
+geoLevels = geoLevels[-which(geoLevels[, 2] == "Niedermuhlern"),]
+geoLevels = geoLevels[-which(geoLevels[, 2] == "Deisswil bei Münchenbuchsee"),]
+geoLevels = geoLevels[-which(geoLevels[, 2] == "Hellsau"),]
+geoLevels = geoLevels[-which(geoLevels[, 2] == "Meienried"),]
+geoLevels = geoLevels[-which(geoLevels[, 2] == "Oberhünigen"),]
+
+dim(geoLevels)
+# View(geoLevels)
+
+t.test(residu_road[which(geoLevels$`Typologie urbain-rural` == 3)], mu = 0)
+```
+
+```{r pressure, echo=FALSE}
+palCal <- colorFactor(palette = "Set3", domain = c(1, 2, 3))
+# Labels correspondants aux valeurs ordinales
+labels_typology <- c("Urban", "Intermediate", "Rural")
+
+leaflet(ch_aggregated) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  # addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView( lat=46.637785, lng=8.2 , zoom=7) %>%
+  # municipality polygons
+  addPolygons(
+    fillColor = ~palCal(geoLevels$`Typologie urbain-rural`),
+    fillOpacity = 0.9,
+    color = "white",
+    weight = 0.1,
+    opacity = 1,
+    highlight = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.7,
+      bringToFront = TRUE,
+      sendToBack = TRUE),
+    # label = paste0(ch_aggregated$NAME, ": ", round(residu_road, 2)),
+    label = ~paste0(geoLevels$`Nom de la commune`, ": ", geoLevels$`Typologie urbain-rural`),
+    smoothFactor = 0.2,
+    # group = "MDS fac. 1",
+  ) %>%
+  addPolylines(
+    data = autoroutes,       # Fournissez ici un objet avec les autoroutes
+    color = "#d47c17",          # Couleur des lignes
+    weight = 1,              # Épaisseur des lignes
+    opacity = 0.8,           # Opacité des lignes
+    label = autoroutes$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolylines(
+    data = projets_2024,       # Fournissez ici un objet avec les autoroutes
+    color = "#d44317",          # Couleur des lignes
+    weight = 3,              # Épaisseur des lignes
+    opacity = 0.9,           # Opacité des lignes
+    label = projets_2024$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolygons(data = lakes,
+              weight = 0.7,
+              fillColor = "#dddddd",
+              fillOpacity = 1,
+              color = "white",
+              highlight = highlightOptions(
+                weight = 1,
+                color = "#666",
+                fillOpacity = 1,
+                bringToFront = TRUE),
+              label = lakes$NAME,
+              labelOptions = labelOptions(
+                style = list(
+                  "color" = "#666",
+                  "font-style" = "italic"
+                )),
+              smoothFactor = 0.2,
+              group = c("lakes")) %>%
+  addLayersControl(
+    # baseGroups = c("MDS fac. 1","MDS fac. 2"), # groups separated by municipality
+    overlayGroups = c("lakes"),
+    options = layersControlOptions(collapsed = TRUE)
+  ) %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
+  addLegend(
+    colors = c("#d47c17", "#d44317"),
+    position = "bottomright",
+    labels = c("Highways", "Voted projects"),
+    opacity = 0.9
+  ) %>%
+  # Ajout de la légende
+  addLegend(
+    colors = palCal(c(1, 2, 3)),  # Couleurs associées aux valeurs 1, 2, 3
+    labels = labels_typology,     # Labels textuels "Urban", "Intermediate", "Rural"
+    position = "bottomright",
+    title = "BFS typology",
+    opacity = 0.9
+  )
+```
+
+9 categories
+```{r pressure, echo=FALSE}
+palCal <- colorFactor(palette = "Set3", domain = unique(geoLevels$`Typologie des communes (9 types)`))
+palette_9 <- c(
+  "#edf8fb", "#b2e2e2", "#66c2a4",  # Catégorie 1 (pâle à foncé)
+  "#fee6ce", "#fdae6b", "#e6550d",  # Catégorie 2 (pâle à foncé)
+  "#f7f4f9", "#d4b9da", "#980043"   # Catégorie 3 (pâle à foncé)
+)
+palette_9_contrast <- c(
+  "#deebf7", "#9ecae1", "#3182bd",  # Groupe 1 
+  "#ffeda0", "#feb24c", "#f03b20",  # Groupe 2
+  "#d5f7a8", "#addd8e", "#31a354"   # Groupe 3 
+)
+palCal <- colorFactor(palette = palette_9_contrast, domain = sort(unique(geoLevels$`Typologie des communes (9 types)`)))
+
+# Labels correspondants aux valeurs ordinales
+labels_typology <- c(
+  "Urban municipality of a large agglomeration",
+  "Urban municipality of a medium-sized agglomeration",
+  "Urban municipality of a small or out-of-agglomeration area",
+  "Peri-urban municipality with high density",
+  "Peri-urban municipality with medium density",
+  "Peri-urban municipality with low density",
+  "Municipality of a rural center",
+  "Rural municipality in a central position",
+  "Peripheral rural municipality"
+)
+
+leaflet(ch_aggregated) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  # addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView( lat=46.637785, lng=8.2 , zoom=7) %>%
+  # municipality polygons
+  addPolygons(
+    fillColor = ~palCal(geoLevels$`Typologie des communes (9 types)`),
+    fillOpacity = 0.9,
+    color = "white",
+    weight = 0.1,
+    opacity = 1,
+    highlight = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.7,
+      bringToFront = TRUE,
+      sendToBack = TRUE),
+    # label = paste0(ch_aggregated$NAME, ": ", round(residu_road, 2)),
+    label = ~paste0(geoLevels$`Nom de la commune`, ": ", geoLevels$`Typologie des communes (9 types)`),
+    smoothFactor = 0.2,
+    # group = "MDS fac. 1",
+  ) %>%
+  addPolylines(
+    data = autoroutes,       # Fournissez ici un objet avec les autoroutes
+    color = "#d47c17",          # Couleur des lignes
+    weight = 1,              # Épaisseur des lignes
+    opacity = 0.8,           # Opacité des lignes
+    label = autoroutes$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolylines(
+    data = projets_2024,       # Fournissez ici un objet avec les autoroutes
+    color = "#d44317",          # Couleur des lignes
+    weight = 3,              # Épaisseur des lignes
+    opacity = 0.9,           # Opacité des lignes
+    label = projets_2024$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolygons(data = lakes,
+              weight = 0.7,
+              fillColor = "#dddddd",
+              fillOpacity = 1,
+              color = "white",
+              highlight = highlightOptions(
+                weight = 1,
+                color = "#666",
+                fillOpacity = 1,
+                bringToFront = TRUE),
+              label = lakes$NAME,
+              labelOptions = labelOptions(
+                style = list(
+                  "color" = "#666",
+                  "font-style" = "italic"
+                )),
+              smoothFactor = 0.2,
+              group = c("lakes")) %>%
+  addLayersControl(
+    # baseGroups = c("MDS fac. 1","MDS fac. 2"), # groups separated by municipality
+    overlayGroups = c("lakes"),
+    options = layersControlOptions(collapsed = TRUE)
+  ) %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
+  addLegend(
+    colors = c("#d47c17", "#d44317"),
+    position = "bottomright",
+    labels = c("Highways", "Voted projects"),
+    opacity = 0.9
+  ) %>%
+  # Ajout de la légende
+  addLegend(
+    colors = palCal(sort(unique(geoLevels$`Typologie des communes (9 types)`))),
+    labels = labels_typology,
+    position = "bottomright",
+    title = "BFS typology",
+    opacity = 0.9
+  )
+```
+
+```{r pressure, echo=FALSE}
+t.test(residu_road[which(geoLevels$`Typologie des communes (9 types)` == 33)], mu = 0)
+```
+ANOVA
+
+```{r pressure, echo=FALSE}
+# Boxplot des poids par régime
+ch_aggregated_geolevels = cbind(ch_aggregated, geoLevels, yes$X6730, swiss_data_muni$f)
+
+ggplot(ch_aggregated_geolevels, aes(x = Typologie.urbain.rural, y = yes.X6730, fill = as.character(Typologie.urbain.rural))) +
+  # Boxplot modernisé
+  geom_boxplot(alpha = 0.2, color = "black", outlier.shape = NA, aes(weight = swiss_data_muni.f))
+
+# Modèle ANOVA
+anova_model <- aov(yes.X6730 ~ Typologie.urbain.rural, data = ch_aggregated_geolevels)
+
+# Résultats de l'ANOVA
+summary(anova_model)
+```
+
+
 Corréations
+
 ```{r pressure, echo=FALSE}
 
 
@@ -380,6 +794,7 @@ View(corr_weighted)
 ```
 
 Extraire les 50 corrélations les plus fortes
+
 ```{r pressure, echo=FALSE}
 # Étape 1 : Mettre la diagonale à NA (pour l'exclure)
 diag(corr_weighted) <- NA
@@ -400,6 +815,7 @@ View(top_50_corr)
 ```
 
 Extraire les nb_votes corrélations les plus fortes avec le vote routes nationales
+
 ```{r pressure, echo=FALSE}
 # Fonction pour obtenir les 50 noms les plus corrélés avec une variable donnée
 nb_votes = dim(corr_weighted)[1]
@@ -446,5 +862,10 @@ merged_table <- merge(top_100_correlations, voteInfo, by = "vote_id", all.x = TR
 
 # Résultat
 View(merged_table)
+
+```
+
+
+```{r pressure, echo=FALSE}
 
 ```

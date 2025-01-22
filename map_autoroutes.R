@@ -1,7 +1,7 @@
 # autoroutes
 
 
-min_time_to_highway = read.csv("/Users/rloup/Desktop/autoroutes/min_time_to_highway3.csv")
+min_time_to_highway = read.csv("min_time_to_highway3.csv")
 
 
 min_time_to_highway$t_min = apply(min_time_to_highway[,2:dim(min_time_to_highway)[2]], 1, FUN = min)
@@ -11,6 +11,12 @@ View(min_time_to_highway)
 pal = leaflet::colorNumeric(
   palette = "Reds",
   domain = round(min_time_to_highway$t_min/60),
+  na.color = "#eeeeee")
+
+pal_rev = leaflet::colorNumeric(
+  palette = "Reds",
+  domain = round(min_time_to_highway$t_min/60),
+  reverse = TRUE,
   na.color = "#eeeeee")
 
 # label for hover
@@ -57,9 +63,18 @@ leaflet(ch) %>%
   # addLegend(pal = factpal, values = ~language, opacity = 0.7, title = NULL,
   #           position = "bottomright")
   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
-  addLegend(pal = pal, values = round(min_time_to_highway$t_min/60), opacity = 0.7, title = "Time",
+  addLegend(
+    colors = c("#d47c17", "#d44317"),
+    position = "bottomright",
+    labels = c("Highways", "Voted projects"),
+    opacity = 0.9
+  )%>%
+  addLegend(pal = pal_rev,
+            values = round(min_time_to_highway$t_min/60), 
+            opacity = 0.7, 
+            title = "Time [min]",
             position = "bottomright",
-            labFormat = labelFormat(transform = function(x) sort(x, decreasing = F))) %>%
+            labFormat = labelFormat(transform = function(x) sort(x, decreasing = T))) %>%
   addPolygons(data = lakes,
               weight = 1,
               fillColor = "#dddddd",
@@ -77,4 +92,17 @@ leaflet(ch) %>%
                   "font-style" = "italic"
                 )),
               smoothFactor = 0.2) %>%
-  addProviderTiles("Stadia.StamenTerrainLines")
+  addPolylines(
+    data = autoroutes,       # Fournissez ici un objet avec les autoroutes
+    color = "#d47c17",          # Couleur des lignes
+    weight = 1,              # Épaisseur des lignes
+    opacity = 0.8,           # Opacité des lignes
+    label = autoroutes$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolylines(
+    data = projets_2024,       # Fournissez ici un objet avec les autoroutes
+    color = "#d44317",          # Couleur des lignes
+    weight = 3,              # Épaisseur des lignes
+    opacity = 0.9,           # Opacité des lignes
+    label = projets_2024$NAME  # Optionnel : ajoute un label si disponible
+  )

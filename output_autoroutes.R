@@ -95,7 +95,7 @@ mds_plot = ggplot() +
   theme(legend.title = element_markdown(lineheight = 1.2))
 mds_plot
 
-# Boxplot
+# Boxplot pondéré
 library(ggplot2)
 library(ggrepel)
 library(dplyr)
@@ -111,19 +111,20 @@ swiss_data_muni$f = f
 
 # Ajouter les coordonnées jitterées dans les données pour un alignement parfait
 swiss_data_muni <- swiss_data_muni %>%
-  mutate(jitter_x = jitter(as.numeric(language_region), amount = 0.2), # Jitter pour l'axe X
+  mutate(jitter_x = jitter(as.numeric(language_region), amount = 0.3), # Jitter pour l'axe X
          jitter_y = resultat.jaStimmenInProzent) # Les valeurs Y restent identiques
 library(ggrepel)
 ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) +
   # Boxplot modernisé
-  geom_boxplot(alpha = 0.2, color = "black", outlier.shape = NA) +
+  geom_boxplot(alpha = 0.2, color = "black", outlier.shape = NA, aes(weight = f)) +
   # Points individuels avec jitter et taille proportionnelle à 'f'
   geom_point(data = swiss_data_muni,
              aes(x = jitter_x, y = jitter_y, color = as.character(language_region), size = f), 
              alpha = 0.6) +
   # Labels pour les outliers alignés avec les points jitterés
   geom_text_repel(
-    data = subset(swiss_data_muni, outlier == TRUE),
+    # data = subset(swiss_data_muni, outlier == TRUE & rank(-f) <= 10),
+    data = subset(swiss_data_muni, outlier == TRUE | rank(-f) <= 15),
     aes(x = jitter_x, y = jitter_y, label = geoLevelname),
     size = 3,
     nudge_y = 2, # Légère élévation des labels
@@ -142,7 +143,7 @@ ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent
   # Ligne de référence
   geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.7) +
   # Design moderne
-  theme_minimal(base_size = 14) +
+  theme_minimal(base_size = 11) +
   theme(
     legend.position = "top",
     panel.grid.major = element_line(color = "gray90"),
@@ -155,7 +156,12 @@ ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent
     x = "Région linguistique",
     y = "Pourcentage de votes 'oui'",
     fill = "Langue"
-  )
+  ) 
+# + scale_x_discrete(labels = c("German", "French", "Italian", "Romansh"))
+
+ggsave("/Users/rloup/Library/CloudStorage/OneDrive-UniversitédeLausanne/routes_nationales/images/weighted_boxplot.png", width = 9, height = 8)
+
+
 library(readxl)
 #--------------------------------
 # Interactive result map
@@ -232,6 +238,86 @@ projets_2024 = st_transform(projets_2024, st_crs(ch_aggregated))
 # Vérifiez les intersections entre les polygones et les lignes
 intersections <- st_intersects(ch_aggregated, projets_2024, sparse = FALSE)
 
+# Ajouter la colonne "road_project_indiv" avec l'id_proj correspondant s'il y a intersection
+ch_aggregated$road_project_indiv <- apply(intersections, 1, function(row) {
+  intersecting_ids <- projets_2024$id_proj[row] # Récupère les id_proj pour les intersections
+  if (length(intersecting_ids) > 0) {
+    return(paste(intersecting_ids, collapse = ", ")) # Concatène les IDs s'il y en a plusieurs
+  } else {
+    return(NA) # Pas d'intersection
+  }
+})
+# Ajouter la colonne "road_project_indiv" avec un seul id_proj (le premier trouvé) pour chaque intersection
+ch_aggregated$road_project_indiv <- apply(intersections, 1, function(row) {
+  intersecting_ids <- projets_2024$id_proj[row] # Récupère les id_proj pour les intersections
+  if (length(intersecting_ids) > 0) {
+    return(intersecting_ids[1]) # Retourne le premier id trouvé
+  } else {
+    return(NA) # Pas d'intersection
+  }
+})
+
+# Identifier les voisins pour chaque entité
+neighbors <- st_touches(ch_aggregated)
+
+# Ajouter la colonne "road_project_indiv_n"
+ch_aggregated$road_project_indiv_n <- sapply(1:length(neighbors), function(i) {
+  # Si la colonne "road_project_indiv" contient déjà une valeur, retourner NA
+  if (!is.na(ch_aggregated$road_project_indiv[i])) {
+    return(NA)
+  }
+  
+  # Récupérer les indices des voisins
+  neighbor_indices <- neighbors[[i]]
+  
+  if (length(neighbor_indices) > 0) {
+    # Récupérer les valeurs des voisins (hors NA)
+    neighbor_values <- na.omit(ch_aggregated$road_project_indiv[neighbor_indices])
+    
+    if (length(neighbor_values) > 0) {
+      # Retourner une seule valeur des voisins (par exemple, la plus fréquente)
+      return(as.integer(names(sort(table(neighbor_values), decreasing = TRUE))[1]))
+    } else {
+      return(NA) # Tous les voisins ont des NA
+    }
+  } else {
+    return(NA) # Pas de voisins
+  }
+})
+
+# Ajouter la colonne "road_project_indiv_n2"
+ch_aggregated$road_project_indiv_n2 <- sapply(1:length(neighbors), function(i) {
+  # Si la colonne "road_project_indiv_n" contient déjà une valeur, retourner NA
+  if (!is.na(ch_aggregated$road_project_indiv_n[i])) {
+    return(NA)
+  }
+  
+  # Récupérer les indices des voisins
+  neighbor_indices <- neighbors[[i]]
+  
+  if (length(neighbor_indices) > 0) {
+    # Récupérer les valeurs des voisins (hors NA)
+    neighbor_values <- na.omit(ch_aggregated$road_project_indiv_n[neighbor_indices])
+    
+    if (length(neighbor_values) > 0) {
+      # Retourner une seule valeur des voisins (par exemple, la plus fréquente)
+      return(as.integer(names(sort(table(neighbor_values), decreasing = TRUE))[1]))
+    } else {
+      return(NA) # Tous les voisins ont des NA
+    }
+  } else {
+    return(NA) # Pas de voisins
+  }
+})
+
+# Afficher les résultats
+View(ch_aggregated)
+
+
+
+
+
+
 # Ajouter la colonne "road_project" : 1 si intersection, 0 sinon
 ch_aggregated$road_project <- apply(intersections, 1, function(row) as.integer(any(row)))
 
@@ -277,6 +363,40 @@ neighbors_of_neighbors <- neighbors_of_neighbors[ch_aggregated$road_project_n[ne
 ch_aggregated$road_project_n[neighbors_of_neighbors] <- 3
 
 View(ch_aggregated)
+
+
+# --- add id by project
+library(sf)
+library(dplyr)
+library(igraph)
+
+# Charger l'objet sf
+# Remplacez 'your_sf_object' par le nom de votre objet sf
+# sf_data <- st_read("path_to_your_file.shp")
+
+# Créer les buffers de 100m autour de chaque entité
+projets_2024 <- projets_2024 %>%
+  mutate(buffer = st_buffer(geometry, dist = 100))
+plot(projets_2024$buffer)
+# Trouver les intersections des buffers
+intersectionsBuff <- st_intersects(projets_2024$buffer)
+
+# Créer un graphe pour regrouper les entités connectées
+graph <- graph_from_adj_list(intersectionsBuff)
+
+# Obtenir les composants connectés (groupes d'entités dans le même buffer)
+components <- components(graph)$membership
+
+# Ajouter une colonne 'id' basée sur les groupes
+projets_2024 <- projets_2024 %>%
+  mutate(id_proj = components)
+
+# Supprimer la colonne temporaire 'buffer' si elle n'est plus nécessaire
+projets_2024 <- projets_2024 %>%
+  select(-buffer)
+
+# Enregistrer ou visualiser les résultats
+st_write(projets_2024, "output_file_with_ids.shp")
 
 
 
