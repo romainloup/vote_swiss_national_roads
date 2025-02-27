@@ -1,7 +1,7 @@
 # autoroutes
 
 
-min_time_to_highway = read.csv("min_time_to_highway3.csv")
+min_time_to_highway = read.csv("min_time_to_highway_2024.csv")
 
 
 min_time_to_highway$t_min = apply(min_time_to_highway[,2:dim(min_time_to_highway)[2]], 1, FUN = min)
@@ -20,9 +20,9 @@ pal_rev = leaflet::colorNumeric(
   na.color = "#eeeeee")
 
 # label for hover
-labels3 = paste0(ch$NAME, ": ", round(min_time_to_highway$t_min/60), " min", collapse = NULL)
+labels3 = paste0(ch_aggregated$NAME, ": ", round(min_time_to_highway$t_min/60), " min", collapse = NULL)
 
-leaflet(ch) %>%
+leaflet(ch_aggregated) %>%
   # addProviderTiles("Stamen.TerrainBackground") %>%
   # addProviderTiles("Esri.WorldShadedRelief") %>%
   addProviderTiles("Esri.WorldTerrain") %>%

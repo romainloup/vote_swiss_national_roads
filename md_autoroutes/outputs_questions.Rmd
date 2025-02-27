@@ -27,22 +27,52 @@ Choroplète
 ```{r pressure, echo=FALSE}
 # Palette de couleurs PRGn ajustée
 my_palette <- colorNumeric(
-  palette = colorRampPalette(c("#af8dc3", "#7fbf7b"))(100), # Transition douce entre violet et vert
+  palette = colorRampPalette(c("#7b3294", "#c2a5cf", "#f7f7f7", "#a6dba0", "#008837"))(100), # Transition douce entre violet et vert
   domain = NULL
 )
+
+my_palette <- colorNumeric(
+  palette = colorRampPalette(c("#7b3294", "#c2a5cf", "#e7e7e7", "#d9f0d3", "#008837"))(100), # Transition plus rapide au centre
+  domain = NULL
+)
+my_palette <- colorNumeric(
+  palette = colorRampPalette(c("#7b3294", "#c2a5cf", "#e0e0e0", "#a6dba0", "#008837"))(100),
+  domain = NULL
+)
+my_palette <- colorNumeric(
+  palette = colorRampPalette(c("#7b3294", "#c2a5cf", "#d9f0d3", "#008837"))(100),
+  domain = NULL
+)
+
+my_palette <- colorNumeric(
+  palette = colorRampPalette(c("#762a83", "#af8dc3", "#e7d4e8", "#f7f7f7", "#d9f0d3", "#7fbf7b", "#1b7837"))(20), # Transition douce entre violet et vert
+  domain = NULL
+)
+
+my_palette <- colorNumeric(
+  palette = colorRampPalette(c("#ca0020", "#f4a582","#f7f7f7", "#92c5de", "#0571b0"))(100), # Transition douce entre violet et vert
+  domain = NULL
+)
+
+my_palette <- colorNumeric(
+  palette = colorRampPalette(c("#7b3294", "#c2a5cf", "#f7f7f7", "#a6dba0", "#008837"))(100), # Transition douce entre violet et vert
+  domain = NULL
+)
+
 rev_my_palette = colorNumeric(
-  palette = colorRampPalette(c("#7fbf7b", "#af8dc3"))(100), # Transition douce entre vert et violet
+  palette = colorRampPalette(c("#008837","#a6dba0", "#f7f7f7", "#c2a5cf", "#7b3294"))(100), # Transition douce entre vert et violet
   domain = NULL
 )
-palDiv = colorNumeric("PRGn", NULL) # color palette
+
+# palDiv = colorNumeric("PRGn", NULL) # color palette
 leaflet(ch_aggregated) %>%
   # addProviderTiles(providers$CartoDB.Positron) %>%
-  addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
   setView( lat=46.637785, lng=8.2 , zoom=7) %>%
   # municipality polygons
   addPolygons(
     fillColor = my_palette(yes$X6730),
-    fillOpacity = 0.9,
+    fillOpacity = 1,
     color = "white",
     weight = 0.1,
     opacity = 1,
@@ -52,7 +82,7 @@ leaflet(ch_aggregated) %>%
       fillOpacity = 0.7,
       bringToFront = TRUE,
       sendToBack = TRUE),
-    label = paste0(ch_aggregated$NAME, ": ", round(yes[,46], 2), "%"),
+    label = paste0(ch_aggregated$NAME, ": ", round(yes$X6730, 2), "%"),
     smoothFactor = 0.2,
     # group = "MDS fac. 1",
   ) %>%
@@ -82,13 +112,14 @@ leaflet(ch_aggregated) %>%
   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
   # Ajout de la légende
   addLegend(
-    pal = my_palette,
+    pal = rev_my_palette,
     values = swiss_data_muni$resultat.jaStimmenInProzent,
     position = "bottomright",
     title = "Oui (%)",
-    labFormat = labelFormat(suffix = "%"),
+    # labFormat = labelFormat(suffix = "%"),
+    labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
     opacity = 0.9
-  )
+    )
 ```
 
 ```{r pressure, echo=FALSE}
@@ -164,7 +195,9 @@ dataSetCircles$vote = yes$X6730
 dataSetCircles = dataSetCircles[order(-f^0.57), ]
 
 leaflet(ch_aggregated) %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
+  # addProviderTiles(providers$CartoDB.Positron) %>%
+  # addProviderTiles("Esri.WorldTerrain") %>%
+  addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
   # addProviderTiles(providers$CartoDB.DarkMatter) %>%
   setView(lat = 46.637785, lng = 8.2, zoom = 7) %>%
   # Ajout des lacs
@@ -195,9 +228,9 @@ leaflet(ch_aggregated) %>%
     lng = ~longitude,
     lat = ~latitude,
     data = dataSetCircles,  # Utilisation des données triées
-    weight = 1,                      # Bordure des cercles
+    weight = 0.25,                      # Bordure des cercles
     radius = ~f^0.57 * 100000,       # Ajustez le multiplicateur pour l'échelle des cercles
-    color = "white",                 # Couleur de la bordure
+    color = "black",                 # Couleur de la bordure
     fillColor = ~my_palette(vote),  # Couleur des cercles proportionnelle aux valeurs
     fillOpacity = 0.95,
     label = ~paste0(NAME, ": ", round(100*vote, 2), "%"),  # Infobulle
@@ -290,7 +323,7 @@ rev_palDiv0 <- colorNumeric("PRGn", domain = scale_range, reverse = TRUE)
 
 
 leaflet(ch_aggregated) %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
+  addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
   # addProviderTiles(providers$CartoDB.DarkMatter) %>%
   setView( lat=46.637785, lng=8.2 , zoom=7) %>%
   # municipality polygons
@@ -513,8 +546,9 @@ summary(reg_projets)
 
 anova(reg_projets)
 ```
-Communes proche entrées/sorties autoroute
-moins de 10', plus de 20 ou plus de 40
+
+Communes proche entrées/sorties autoroute moins de 10', plus de 20 ou plus de 40
+
 ```{r pressure, echo=FALSE}
 
 road_time = 90
@@ -523,12 +557,10 @@ t.test(residu_road[which(min_time_to_highway$t_min < road_time*60)], mu = 0)
 # more than x min
 t.test(residu_road[which(min_time_to_highway$t_min > road_time*60)], mu = 0)
 ```
+
 Geolevels OFS
 
-Typologie urbain-rural
-- 1 Urbain
-- 2 Intermédiaire (périurbain dense et centres ruraux)
-- 3 Rural
+Typologie urbain-rural - 1 Urbain - 2 Intermédiaire (périurbain dense et centres ruraux) - 3 Rural
 
 ```{r pressure, echo=FALSE}
 # Loading
@@ -632,6 +664,7 @@ leaflet(ch_aggregated) %>%
 ```
 
 9 categories
+
 ```{r pressure, echo=FALSE}
 palCal <- colorFactor(palette = "Set3", domain = unique(geoLevels$`Typologie des communes (9 types)`))
 palette_9 <- c(
@@ -738,6 +771,7 @@ leaflet(ch_aggregated) %>%
 ```{r pressure, echo=FALSE}
 t.test(residu_road[which(geoLevels$`Typologie des communes (9 types)` == 33)], mu = 0)
 ```
+
 ANOVA
 
 ```{r pressure, echo=FALSE}
@@ -750,11 +784,122 @@ ggplot(ch_aggregated_geolevels, aes(x = Typologie.urbain.rural, y = yes.X6730, f
 
 # Modèle ANOVA
 anova_model <- aov(yes.X6730 ~ Typologie.urbain.rural, data = ch_aggregated_geolevels)
+anova_model <- aov(yes.X6730 ~ Typologie.des.communes..9.types., data = ch_aggregated_geolevels)
+anova_model <- aov(yes.X6730 ~ Typologie.des.communes..25.types., data = ch_aggregated_geolevels)
+
+model_pondere <- lm(yes.X6730 ~ Typologie.urbain.rural, data = ch_aggregated_geolevels, weights = swiss_data_muni.f)
+model_pondere <- lm(yes.X6730 ~ Typologie.des.communes..9.types., data = ch_aggregated_geolevels, weights = swiss_data_muni.f)
+model_pondere <- lm(yes.X6730 ~ Typologie.des.communes..25.types., data = ch_aggregated_geolevels, weights = swiss_data_muni.f)
 
 # Résultats de l'ANOVA
 summary(anova_model)
+# Résumé du modèle
+summary(model_pondere)
+
+# Test post-hoc Tukey
+tukey_results <- TukeyHSD(anova_model)
+
+# Visualiser les intervalles de confiance du test post-hoc
+plot(tukey_results, las = 1, col = "blue")
 ```
 
+Language
+
+```{r pressure, echo=FALSE}
+ch_aggregated_geolevels$language = detailed_language_2024$language_region
+
+model_pondere_lang <- lm(yes.X6730 ~ as.character(language), data = ch_aggregated_geolevels, weights = swiss_data_muni.f)
+
+summary(model_pondere_lang)
+
+residu_road_lang = ch_aggregated_geolevels$yes.X6730 - predict(model_pondere_lang)
+ch_aggregated_geolevels$residu_road_lang = residu_road_lang*100
+```
+
+```{r pressure, echo=FALSE}
+maxDataL = ch_aggregated_geolevels$residu_road_lang[which.max( abs(ch_aggregated_geolevels$residu_road_lang) )]
+
+scale_range2 <- c(-maxDataL, maxDataL)
+palDiv2 <- colorNumeric("PRGn", domain = scale_range2)
+rev_palDiv2 <- colorNumeric("PRGn", domain = scale_range2, reverse = TRUE)
+
+leaflet(ch_aggregated_geolevels) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  # addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView( lat=46.637785, lng=8.2 , zoom=7) %>%
+  # municipality polygons
+  addPolygons(
+    fillColor = ~palDiv2(residu_road_lang),
+    fillOpacity = 0.9,
+    color = "white",
+    weight = 0.1,
+    opacity = 1,
+    highlight = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.7,
+      bringToFront = TRUE,
+      sendToBack = TRUE),
+    label = paste0(ch_aggregated_geolevels$NAME, ": ", round(residu_road_lang, 2)),
+    smoothFactor = 0.2,
+    # group = "MDS fac. 1",
+  ) %>%
+  addPolylines(
+    data = autoroutes,       # Fournissez ici un objet avec les autoroutes
+    color = "#d47c17",          # Couleur des lignes
+    weight = 1,              # Épaisseur des lignes
+    opacity = 0.8,           # Opacité des lignes
+    label = autoroutes$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolylines(
+    data = projets_2024,       # Fournissez ici un objet avec les autoroutes
+    color = "#d44317",          # Couleur des lignes
+    weight = 3,              # Épaisseur des lignes
+    opacity = 0.9,           # Opacité des lignes
+    label = projets_2024$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolygons(data = lakes,
+              weight = 0.7,
+              fillColor = "#dddddd",
+              fillOpacity = 1,
+              color = "white",
+              highlight = highlightOptions(
+                weight = 1,
+                color = "#666",
+                fillOpacity = 1,
+                bringToFront = TRUE),
+              label = lakes$NAME,
+              labelOptions = labelOptions(
+                style = list(
+                  "color" = "#666",
+                  "font-style" = "italic"
+                )),
+              smoothFactor = 0.2,
+              group = c("lakes")) %>%
+  addLayersControl(
+    # baseGroups = c("MDS fac. 1","MDS fac. 2"), # groups separated by municipality
+    overlayGroups = c("lakes"),
+    options = layersControlOptions(collapsed = TRUE)
+  ) %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
+  addLegend(
+    colors = c("#d47c17", "#d44317"),
+    position = "bottomright",
+    labels = c("Highways", "Voted projects"),
+    opacity = 0.9
+  ) %>%
+  # Ajout de la légende
+  addLegend(
+    pal = rev_palDiv2,
+    values = scale_range2,
+    position = "bottomright",
+    title = "Residual langague",
+    # labFormat = labelFormat(suffix = "%"),
+    labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
+
+    opacity = 0.9
+  )
+```
 
 Corréations
 
@@ -865,7 +1010,249 @@ View(merged_table)
 
 ```
 
+```{r pressure, echo=FALSE}
+reg_model_10 = lm(yes$X6730 ~ yes$X6760 + yes$X6750 + yes$X6740, 
+                  weights = f)
+
+# 10 dernières années
+variables_to_include <- paste0("yes$X", seq(5900,6720,by=10))
+variables_to_include2 <- paste0("yes$X", seq(6740,6760,by=10))
+
+formula <- as.formula(paste("yes$X6730 ~", paste(variables_to_include, collapse = " + "), " + ",
+                            paste(variables_to_include2, collapse = " + ")))
+reg_model_10 <- lm(formula, weights = f)
+
+# Supposons que toutes les colonnes soient dans le data frame 'yes'
+# reg_model_10 <- lm(yes$X6730 ~ ., data = yes[, paste0("X", seq(5900,6720,by=10))] +
+#                      yes[, paste0("X", seq(6740,6760,by=10))], weights = f)
+
+summary(reg_model_10)
+# Résidus
+residu_road_10 = yes$X6730 - predict(reg_model_10)
+ch_aggregated_geolevels$residu_road_10 = residu_road_10*100
+```
+
+Mapping
 
 ```{r pressure, echo=FALSE}
+maxData10 = ch_aggregated_geolevels$residu_road_10[which.max( abs(ch_aggregated_geolevels$residu_road_10) )]
 
+scale_range3 <- c(-maxData10, maxData10)
+palDiv3 <- colorNumeric("PRGn", domain = scale_range2)
+rev_palDiv3 <- colorNumeric("PRGn", domain = scale_range2, reverse = TRUE)
+
+leaflet(ch_aggregated_geolevels) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  # addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView( lat=46.637785, lng=8.2 , zoom=7) %>%
+  # municipality polygons
+  addPolygons(
+    fillColor = ~palDiv3(residu_road_10),
+    fillOpacity = 0.9,
+    color = "white",
+    weight = 0.1,
+    opacity = 1,
+    highlight = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.7,
+      bringToFront = TRUE,
+      sendToBack = TRUE),
+    label = paste0(ch_aggregated_geolevels$NAME, ": ", round(residu_road_10, 2)),
+    smoothFactor = 0.2,
+    # group = "MDS fac. 1",
+  ) %>%
+  addPolylines(
+    data = autoroutes,       # Fournissez ici un objet avec les autoroutes
+    color = "#d47c17",          # Couleur des lignes
+    weight = 1,              # Épaisseur des lignes
+    opacity = 0.8,           # Opacité des lignes
+    label = autoroutes$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolylines(
+    data = projets_2024,       # Fournissez ici un objet avec les autoroutes
+    color = "#d44317",          # Couleur des lignes
+    weight = 3,              # Épaisseur des lignes
+    opacity = 0.9,           # Opacité des lignes
+    label = projets_2024$NAME  # Optionnel : ajoute un label si disponible
+  ) %>%
+  addPolygons(data = lakes,
+              weight = 0.7,
+              fillColor = "#dddddd",
+              fillOpacity = 1,
+              color = "white",
+              highlight = highlightOptions(
+                weight = 1,
+                color = "#666",
+                fillOpacity = 1,
+                bringToFront = TRUE),
+              label = lakes$NAME,
+              labelOptions = labelOptions(
+                style = list(
+                  "color" = "#666",
+                  "font-style" = "italic"
+                )),
+              smoothFactor = 0.2,
+              group = c("lakes")) %>%
+  addLayersControl(
+    # baseGroups = c("MDS fac. 1","MDS fac. 2"), # groups separated by municipality
+    overlayGroups = c("lakes"),
+    options = layersControlOptions(collapsed = TRUE)
+  ) %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
+  addLegend(
+    colors = c("#d47c17", "#d44317"),
+    position = "bottomright",
+    labels = c("Highways", "Voted projects"),
+    opacity = 0.9
+  ) %>%
+  # Ajout de la légende
+  addLegend(
+    pal = rev_palDiv3,
+    values = scale_range3,
+    position = "bottomright",
+    title = "Residual 10 years",
+    # labFormat = labelFormat(suffix = "%"),
+    labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
+
+    opacity = 0.9
+  )
+```
+
+Revenus
+
+```{r pressure, echo=FALSE}
+incomes = read.csv("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/IFD_classes_revenu_net_normaux_2024.csv")
+contributors = read.csv("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/IFD_classes_revenu_net_normaux_nb_contribuables_2024.csv")
+
+# Highway distance
+DA = as.matrix(dist(yes$X6730^2))
+KA = -0.5 * diag(sqrt(f)) %*% H %*% DA %*% t(H) %*% diag(sqrt(f)) # political kernel
+
+# "transport" package
+if (!require("transport")) install.packages("transport")
+library(transport)
+library(dplyr)
+
+# Distance Wasserstein
+richesse_data = incomes[,3:12]
+
+# last class mean/median
+mean_big_income = sum(incomes$X1.000.001...u.m..et.plus) / sum(contributors$X1.000.001...u.m..et.plus)
+
+# Définir les points des centres des tranches de richesse (approximatif)
+points_tranches = c(0, 15000, 35000, 45000, 62500, 87500, 150000, 350000, 750000, 2000000)
+
+coord = matrix(cbind(points_tranches, rep(0,length(points_tranches))),length(points_tranches),2)
+
+n = 2126
+list_wpp = list()
+for (i in 1:n) {
+  distrib = richesse_data[i,] / sum(richesse_data[i,])
+  list_wpp[[i]] = wpp(coord, distrib)
+}
+
+DI = matrix(NA,n,n)
+for (i in 1:(n-1)) {
+  for (j in (i+1):n) {
+     DI[[i,j]] = wasserstein(list_wpp[[i]], list_wpp[[j]])
+  }
+  print(i)
+}
+
+
+DI_stock = DI
+DI = DI_stock
+# Complete DI
+DI = matrix(NA,n,n)
+DI = ifelse(is.na(DI_stock), t(DI_stock), DI_stock)
+diag(DI) = 0
+isSymmetric(DI)
+colnames(DI) = incomes$BFS_n
+
+dim(DI)
+View(DI)
+
+
+write.csv(DI, "DI.csv", row.names = F)
+
+# Calculer la distance Wasserstein entre chaque paire de communes
+n = nrow(richesse_data)
+distances_W = matrix(0, n, n)
+
+# Calculer la distance Wasserstein 1D entre chaque paire de communes
+for (i in 1:n) {
+  for (j in 1:n) {
+    # Calcul de la distance de Wasserstein 1D
+    distances_W[i, j] <- wasserstein1d(
+      a = points_tranches,
+      b = points_tranches,
+      wa = as.numeric(richesse_data[i, ]),
+      wb = as.numeric(richesse_data[j, ])
+    )
+  }
+}
+
+# Convertir la matrice de distances en DataFrame
+DI = as.data.frame(distances_W)
+colnames(DI) = data$municipality
+rownames(DI) = data$municipality
+
+DI_stock2 = DI
+
+# P_rel for X
+# DI = as.matrix(dist(incomes[,3:12])^2) # wealth distances between municipalities from incomes
+KI = -0.5 * diag(sqrt(f)) %*% H %*% DI %*% t(H) %*% diag(sqrt(f)) # wealth kernel
+
+
+eigen_val_I = eigen(KI)
+U_I = eigen_val_I$vectors
+lambda_I = eigen_val$values
+  
+# MDS
+Y_I = diag(1/sqrt(f)) %*% U_I %*% diag(sqrt(lambda_I))
+mds_I = as.data.frame(Y_I[,1:2])
+names(mds_I) = c("f1", "f2")
+mds_I$municipality = incomes$municipality
+mds_I$language = as.character(ch_aggregated_geolevels$language)
+mds_I$f = ch_aggregated_geolevels$swiss_data_muni.f
+
+# Plot
+propDeltaPC_I = round(100*lambda_I / sum(lambda_I), digits = 1 )
+magnif = 0.2+0.5*(log(f)-min(log(f)))/(max(log(f))-min(log(f))) # defines a magnification factor for the object weights (here from 0.5 to 2)
+
+mds_filtered_I = mds_I[mds_I$f > sort(mds_I$f, decreasing = TRUE)[51], ]
+mds_filtered_I = mds_filtered_I[order(mds_filtered_I$f, decreasing = TRUE),]
+
+xlab = paste("Factor 1, inertia explained =",propDeltaPC_I[1],"%")
+ylab = paste("Factor 2, inertia explained =",propDeltaPC_I[2],"%")
+limits = range(-mds_I$f1, -mds_I$f2)
+
+
+mds_income = ggplot() +
+  geom_vline(xintercept = 0,linetype="dashed") +
+  geom_hline(yintercept = 0, linetype="dashed") +
+  geom_point(aes(x = -mds_I[,1], y = -mds_I[,2], size=f, color=mds_I$language),
+               alpha = magnif) +
+  ggrepel::geom_text_repel(aes(x = -mds_filtered_I[,1], y = -mds_filtered_I[,2], label = mds_filtered_I$municipality),
+                    box.padding = 0.5,   # Espace autour des étiquettes
+                    point.padding = 0.3, # Espace autour des points
+                    max.overlaps = Inf ) +
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
+                       labels = c("German", "French", "Italian","Romansh")) +
+  labs(x = xlab, y = ylab) +
+  labs(size = "Reg. weight *f*", color = "Language") +
+  scale_size_continuous(range = c(1, 8)) +
+  theme_minimal() +
+  theme(legend.title = ggtext::element_markdown(lineheight = 1.2))
+
+ggplotly(mds_income)
+
+
+wealth_mean <- rowMeans(KI)
+pol50_mean <- rowMeans(KX)
+geo_mean <- rowMeans(KW)
+lm_model <- lm(residu_road ~ wealth_mean + pol50_mean + geo_mean, weights = f)
+summary(geo_mean)
+residu_tot = swiss_data_muni$resultat.jaStimmenInProzent - predict(lm_model)
 ```

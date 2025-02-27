@@ -56,7 +56,7 @@ library(ggplot2)
 library(gridExtra) # Pour combiner les graphiques
 
 # Initialisation des variables
-road_time_values <- seq(1, 141, by = 10) # Incréments de 10
+road_time_values <- seq(1, 146, by = 5) # Incréments de 10
 mean_values <- data.frame(
   RoadTime = numeric(),
   Group = character(),
@@ -78,13 +78,13 @@ for (road_time in road_time_values) {
   mean_values <- rbind(mean_values,
                        data.frame(
                          RoadTime = road_time,
-                         Group = "Less than road_time",
+                         Group = "Less than road time",
                          Mean = t_test_group1$estimate,
                          PValue = t_test_group1$p.value
                        ),
                        data.frame(
                          RoadTime = road_time,
-                         Group = "Greater than road_time",
+                         Group = "Greater than road time",
                          Mean = t_test_group2$estimate,
                          PValue = t_test_group2$p.value
                        ))
@@ -106,12 +106,19 @@ plot_pvalue <- ggplot(mean_values, aes(x = RoadTime, y = PValue, color = Group))
        x = "Road Time Threshold (minutes)",
        y = "P-value",
        color = "Group") +
+  geom_hline(yintercept = 0.0001, linetype="dashed", color = "red") +
+  # annotate("text", x = 0, y = 0.0003, label="0.0001", color="red") +
   theme_minimal() +
   scale_y_continuous(trans = "log10", labels = scales::scientific) + # Échelle logarithmique pour p-values
   labs(y = "P-value (log scale)")
 
 # Combinaison des graphiques
 grid.arrange(plot_mean, plot_pvalue, ncol = 1)
+
+gA <- ggplotGrob(plot_mean)
+gB <- ggplotGrob(plot_pvalue)
+grid::grid.newpage()
+grid::grid.draw(rbind(gA, gB))
 
 ggsave("/Users/rloup/Library/CloudStorage/OneDrive-UniversitédeLausanne/routes_nationales/images/two_lines.png", width = 9, height = 8)
 
