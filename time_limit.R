@@ -122,3 +122,122 @@ grid::grid.draw(rbind(gA, gB))
 
 ggsave("/Users/rloup/Library/CloudStorage/OneDrive-UniversitédeLausanne/routes_nationales/images/two_lines.png", width = 9, height = 8)
 
+
+# --- v3 loess
+
+library(ggplot2)
+
+# Création du dataframe
+data_loess <- data.frame(
+  Distance = min_time_to_highway$t_min / 60, # Conversion en heures si nécessaire
+  Residuals = residu_road,
+  Language = ch_aggregated_geolevels$language,
+  f = ch_aggregated_geolevels$swiss_data_muni.f
+)
+
+# Graphique avec régression LOESS pondérée
+plot_loess <- ggplot(data_loess, aes(x = Distance, y = Residuals)) +
+  geom_point(alpha = 0.5, color = "blue") + # Points avec transparence
+  geom_smooth(method = "loess", formula = y ~ x, se = TRUE, color = "red", fill = "pink") +
+  labs(
+    title = "Régression LOESS des résidus en fonction de la distance parcourue",
+    x = "Distance parcourue (minutes)",
+    y = "Résidus"
+  ) +
+  theme_minimal()
+
+# Affichage
+print(plot_loess)
+
+
+# --- v4 loess
+library(ggplot2)
+
+# Création du dataframe
+data_loess <- data.frame(
+  Distance = min_time_to_highway$t_min / 60, # Conversion en heures si nécessaire
+  Residuals = residu_road,
+  Language = factor(ch_aggregated_geolevels$language, 
+                    levels = c(1, 2, 3, 4), 
+                    labels = c("German", "French", "Italian", "Romansh")), # Attribution des labels
+  f = ch_aggregated_geolevels$swiss_data_muni.f
+)
+
+magnif = 0.2+0.5*(log(f)-min(log(f)))/(max(log(f))-min(log(f))) # defines a magnification factor for the object weights (here from 0.5 to 2)
+
+# Graphique avec régression LOESS pondérée
+plot_loess <- ggplot(data_loess, aes(x = Distance, y = Residuals, color = Language, size = magnif)) +
+  geom_point(alpha = 0.6) + # Points avec transparence
+  geom_smooth(method = "loess", formula = y ~ x, se = TRUE, color = "black", fill = "grey70") + # Courbe LOESS en noir
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"), 
+                     labels = c("German", "French", "Italian", "Romansh")) +
+  scale_size_continuous(range = c(1, 6)) + # Ajuste l'échelle des tailles de points
+  labs(
+    title = "Régression LOESS des résidus en fonction de la distance parcourue",
+    x = "Distance parcourue (minutes)",
+    y = "Résidus",
+    color = "Language",
+    size = "Population (f)"
+  ) +
+  theme_minimal()
+
+# Affichage
+print(plot_loess)
+
+
+# --- v5 loess pondéré
+library(ggplot2)
+
+# Création du dataframe
+data_loess <- data.frame(
+  Distance = min_time_to_highway$t_min / 60, # Conversion en heures si nécessaire
+  Residuals = residu_road,
+  Language = factor(ch_aggregated_geolevels$language, 
+                    levels = c(1, 2, 3, 4), 
+                    labels = c("German", "French", "Italian", "Romansh")), # Attribution des labels
+  f = ch_aggregated_geolevels$swiss_data_muni.f # Poids des points
+)
+
+# Régression LOESS pondérée
+loess_model <- loess(Residuals ~ Distance, data = data_loess, weights = f, span = 0.75) # span: the parameter alpha which controls the degree of smoothing.
+
+# Prédictions pour dessiner la courbe
+grid_distance <- seq(min(data_loess$Distance), max(data_loess$Distance), length.out = 300)
+loess_pred <- predict(loess_model, newdata = data.frame(Distance = grid_distance), se = TRUE)
+
+# Dataframe pour la courbe LOESS avec intervalle de confiance
+loess_df <- data.frame(
+  Distance = grid_distance,
+  Fit = loess_pred$fit,
+  Lower = loess_pred$fit - 1.96 * loess_pred$se.fit, # Intervalle de confiance 95%
+  Upper = loess_pred$fit + 1.96 * loess_pred$se.fit
+)
+
+# Graphique avec LOESS pondérée
+plot_loess <- ggplot() +
+  # Points colorés selon la langue et taille selon f
+  geom_point(data = data_loess, aes(x = Distance, y = Residuals, color = Language, size = f), alpha = 0.6) +
+  # Intervalle de confiance de la LOESS
+  geom_ribbon(data = loess_df, aes(x = Distance, ymin = Lower, ymax = Upper), fill = "grey60", alpha = 0.4) +
+  # Courbe LOESS pondérée
+  geom_line(data = loess_df, aes(x = Distance, y = Fit), color = "black", size = 1.2) +
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), 
+                     labels = c("German", "French", "Italian", "Romansh")) +
+  scale_size_continuous(range = c(1, 6)) + # Ajuste l'échelle des tailles de points
+  labs(
+    title = "Weighted LOESS regression of residuals as a function of distance travelled",
+    x = "Travel time (minutes)",
+    y = "Residuals (%)",
+    color = "Language",
+    size = "Population (f)"
+  ) +
+  geom_hline(yintercept = 0.0001, linetype="dashed", color = "red") +
+  theme_minimal()
+
+# Affichage du graphique
+print(plot_loess)
+ggsave("/Users/rloup/Library/CloudStorage/OneDrive-UniversitédeLausanne/routes_nationales/images/loess_reg.png", width = 9, height = 8)
+
+# Zoom
+plot_loess + coord_cartesian(xlim = c(0, 25), ylim = c(-5, 5))
+ggsave("/Users/rloup/Library/CloudStorage/OneDrive-UniversitédeLausanne/routes_nationales/images/loess_reg_zoom.png", width = 9, height = 8)

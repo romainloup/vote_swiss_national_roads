@@ -106,17 +106,22 @@ mds_outliers = mds %>%
                             V1 > quantile(V1, 0.75) + 1.5 * IQR(V1), TRUE, FALSE))
 
 swiss_data_muni$language_region = detailed_language_2024$language_region
+swiss_data_muni$language_region = ch_aggregated_geolevels$Typologie.urbain.rural
 swiss_data_muni$outlier = mds_outliers$outlier
 swiss_data_muni$f = f
 
 # Ajouter les coordonnées jitterées dans les données pour un alignement parfait
 swiss_data_muni <- swiss_data_muni %>%
   mutate(jitter_x = jitter(as.numeric(language_region), amount = 0.3), # Jitter pour l'axe X
-         jitter_y = resultat.jaStimmenInProzent) # Les valeurs Y restent identiques
+         # jitter_y = resultat.jaStimmenInProzent) # Les valeurs Y restent identiques
+         jitter_y = residu_road) # Les valeurs Y restent identiques
+
 library(ggrepel)
-ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) +
+# ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent, fill = as.character(language_region))) +
+ggplot(swiss_data_muni, aes(x = language_region, y = residu_road, fill = as.character(language_region))) +
+  
   # Boxplot modernisé
-  geom_boxplot(alpha = 0.2, color = "black", outlier.shape = NA, aes(weight = f)) +
+  geom_boxplot(alpha = 0.2, color = "black", outlier.shape = NA, aes(weight = f)) + # alpha = 0.2 pour langue
   # Points individuels avec jitter et taille proportionnelle à 'f'
   geom_point(data = swiss_data_muni,
              aes(x = jitter_x, y = jitter_y, color = as.character(language_region), size = f), 
@@ -135,9 +140,14 @@ ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent
     max.overlaps = Inf
   ) +
   # Palette de couleurs pour le remplissage
-  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
-                    labels = c("German", "French", "Italian", "Romansh")) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
+  # scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
+  #                   labels = c("German", "French", "Italian", "Romansh")) +
+  scale_fill_manual(values = c("#8dd3c7", "#ffffb3", "#bebada"),
+                    labels = c("Urban", "Intermediate", "Rural")) +
+  
+  # scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
+  scale_color_manual(values = c("#8dd3c7", "#ffffb3", "#bebada"), guide = "none") +
+  
   # Échelle pour la taille des points
   scale_size_continuous(name = "Taille de la commune", range = c(1, 10)) +
   # Ligne de référence
@@ -153,13 +163,16 @@ ggplot(swiss_data_muni, aes(x = language_region, y = resultat.jaStimmenInProzent
   labs(
     # title = "Résultats des votes par région linguistique",
     # subtitle = "Distribution des résultats en pourcentage de votes 'oui' par langue, pondérés par la taille des communes",
-    x = "Région linguistique",
-    y = "Pourcentage de votes 'oui'",
-    fill = "Langue"
-  ) 
+    # x = "Linguistic region",
+    x = "Urban-rural BFS 3-degree typology",
+    # y = "'yes' pourcentage",
+    y = "Residuals of 'yes' pourcentage",
+    # fill = "Spoken language"
+    fill = "Typology"
+  )
 # + scale_x_discrete(labels = c("German", "French", "Italian", "Romansh"))
 
-ggsave("/Users/rloup/Library/CloudStorage/OneDrive-UniversitédeLausanne/routes_nationales/images/weighted_boxplot.png", width = 9, height = 8)
+ggsave("/Users/rloup/Library/CloudStorage/OneDrive-UniversitédeLausanne/routes_nationales/images/weighted_boxplot_typology_residuals.png", width = 9, height = 8)
 
 
 library(readxl)

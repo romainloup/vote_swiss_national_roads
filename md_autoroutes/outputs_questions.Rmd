@@ -18,8 +18,22 @@ knitr::opts_chunk$set(echo = TRUE)
 -   Débats sur la transition mobilitaire, remise en question de l’automobilité, etc.
 -   Intérêt d’une votation à l’échelle nationale pour analyser le soutien/l’opposition à l’extension du réseau autoroutier
 
-### Étape I : carte descriptive
+### Étape 0 : répartition des votants
 
+```{r pressure, echo=FALSE}
+# Language: German, French, Italian, Romansh
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$language == 1)])
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$language == 2)])
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$language == 3)])
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$language == 4)])
+
+# Typology: Urban, Intermediate, Rural
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$Typologie.urbain.rural == 1)])
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$Typologie.urbain.rural == 2)])
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$Typologie.urbain.rural == 3)])
+```
+
+### Étape I : carte descriptive
 A faire : inverser oui/non
 
 Choroplète
@@ -259,6 +273,16 @@ leaflet(ch_aggregated) %>%
 
 ```
 
+```{r pressure, echo=FALSE}
+# Language F-ratio
+summary(lm(yes.X6730 ~ as.character(language), data = ch_aggregated_geolevels, weights = swiss_data_muni.f))
+# Typology F-ratio
+summary(lm(yes.X6730 ~ as.character(Typologie.urbain.rural), data = ch_aggregated_geolevels, weights = swiss_data_muni.f))
+
+# Typology F-ratio, residuals
+summary(lm(residu_road ~ as.character(Typologie.urbain.rural), data = ch_aggregated_geolevels, weights = swiss_data_muni.f))
+
+```
 ### Étape II : modèle
 
 Comment expliquer la variation du % de non entre les communes ?
@@ -281,8 +305,14 @@ rev_my_palette = colorNumeric(
 )
 # --- Regression
 # Régression pondérée 2ers facteurs MDS sur toutes les votations
-reg_model = lm(resultat.jaStimmenInProzent ~ mds$V1 + mds$V2, data = swiss_data_muni, weights = f) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
+reg_model = lm(resultat.jaStimmenInProzent ~ mds$V1, data = swiss_data_muni, weights = f) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
 summary(reg_model)
+
+reg_fac1 = lm(resultat.jaStimmenInProzent ~ mds$V1, data = swiss_data_muni, weights = f)
+summary(reg_fac1)
+
+reg_fac2 = lm(resultat.jaStimmenInProzent ~ mds$V2, data = swiss_data_muni, weights = f)
+summary(reg_fac2)
 # Résidus
 residu_road = swiss_data_muni$resultat.jaStimmenInProzent - predict(reg_model)
 ch_aggregated$residu_road = residu_road
@@ -1125,6 +1155,17 @@ Revenus
 incomes = read.csv("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/IFD_classes_revenu_net_normaux_2024.csv")
 contributors = read.csv("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/IFD_classes_revenu_net_normaux_nb_contribuables_2024.csv")
 
+# --- Kernel 1D
+wealth_f = as.data.frame(incomes$BFS_n)
+names(wealth_f) = "BFS_n"
+wealth_f$municipality = incomes$municipality
+wealth_f$wealth_f = incomes$Total...Totale/contributors$Total...Totale
+
+Dw = as.matrix(dist(log(wealth_f$wealth_f)) ^ 2)
+Kw = -0.5 * diag(sqrt(f)) %*% H %*% Dw %*% t(H) %*% diag(sqrt(f))
+
+# --- Kernel Wasserstein
+
 # Highway distance
 DA = as.matrix(dist(yes$X6730^2))
 KA = -0.5 * diag(sqrt(f)) %*% H %*% DA %*% t(H) %*% diag(sqrt(f)) # political kernel
@@ -1174,7 +1215,7 @@ dim(DI)
 View(DI)
 
 
-write.csv(DI, "DI.csv", row.names = F)
+# write.csv(DI, "DI.csv", row.names = F)
 
 # Calculer la distance Wasserstein entre chaque paire de communes
 n = nrow(richesse_data)
@@ -1205,7 +1246,7 @@ DI_stock2 = DI
 KI = -0.5 * diag(sqrt(f)) %*% H %*% DI %*% t(H) %*% diag(sqrt(f)) # wealth kernel
 
 
-eigen_val_I = eigen(KI)
+eigen_val_I = eigen(Kw)
 U_I = eigen_val_I$vectors
 lambda_I = eigen_val$values
   
@@ -1232,7 +1273,9 @@ limits = range(-mds_I$f1, -mds_I$f2)
 mds_income = ggplot() +
   geom_vline(xintercept = 0,linetype="dashed") +
   geom_hline(yintercept = 0, linetype="dashed") +
-  geom_point(aes(x = -mds_I[,1], y = -mds_I[,2], size=f, color=mds_I$language),
+  # geom_point(aes(x = -mds_I[,1], y = -mds_I[,2], size=f, color=mds_I$language),
+  #              alpha = magnif) +
+  geom_point(aes(x = list_results2$Y_list[[2]][,1], y = list_results2$Y_list[[2]][,2], size=f, color=mds_I$language),
                alpha = magnif) +
   ggrepel::geom_text_repel(aes(x = -mds_filtered_I[,1], y = -mds_filtered_I[,2], label = mds_filtered_I$municipality),
                     box.padding = 0.5,   # Espace autour des étiquettes
@@ -1246,7 +1289,7 @@ mds_income = ggplot() +
   theme_minimal() +
   theme(legend.title = ggtext::element_markdown(lineheight = 1.2))
 
-ggplotly(mds_income)
+plotly::ggplotly(mds_income)
 
 
 wealth_mean <- rowMeans(KI)
@@ -1255,4 +1298,63 @@ geo_mean <- rowMeans(KW)
 lm_model <- lm(residu_road ~ wealth_mean + pol50_mean + geo_mean, weights = f)
 summary(geo_mean)
 residu_tot = swiss_data_muni$resultat.jaStimmenInProzent - predict(lm_model)
+
+# --- Corr Kw (wealth simple) KI (wealth Wasserstein)
+
+list_results2 = RV(dist_types,f)
+# wCorr::weightedCorr(Kw, KI,
+#              method = "Pearson",
+#              weights = f)
+
+
+ggplot(data = as.data.frame(list_results2$Y_list[[2]]), aes(x = V1, y = V2)) +
+  geom_bar(stat = "identity", fill = "grey") +
+  labs(
+    title = NULL,
+    x = expression(paste("Dimensions ", alpha, " = 1, ..., 20")),
+    # x = expression(paste("Dimensions ", alpha, " = 1, ..., n-1")),
+    # x = expression(paste("Dimensions ", alpha, " = 1200, ..., 1300")),
+    y = expression(paste("Eigenvalue ", mu[alpha]))
+  ) + theme_minimal()
+
+ggplot(as.data.frame(list_results2$Y_list[[2]]), aes(x = V1, fill = as.character(ch_aggregated_geolevels$language))) + 
+  geom_boxplot() +
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
+                    labels = c("German", "French", "Italian","Romansh"))
+
+mds_to_plot = as.data.frame(list_results2$Y_list[[2]])
+mds_to_plot$langue = ch_aggregated_geolevels$language
+mds_to_plot$commune = ch_aggregated_geolevels$Nom.de.la.commune
+
+# --- Boxplot with outliers
+mds_outliers2 = mds_to_plot %>%
+  group_by(langue) %>%
+  mutate(outlier = ifelse(V1 < quantile(V1, 0.25) - 1.5 * IQR(V1) |
+                            V1 > quantile(V1, 0.75) + 1.5 * IQR(V1), TRUE, FALSE))
+
+# Plot avec les noms des outliers
+ggplot(as.data.frame(mds_to_plot), aes(x = langue, y = V1, fill = as.character(langue))) + 
+  geom_boxplot() +
+  # geom_text(data = subset(mds_outliers2, outlier == TRUE), 
+  #           aes(label = commune), 
+  #           # position = position_jitter(width = 0.2, height = 0),
+  #           size = 3, vjust = -0.5) +
+  geom_text_repel(data = subset(mds_outliers2, outlier == TRUE), 
+            aes(label = commune), 
+            size = 3, vjust = -0.5,
+            max.overlaps = 15) +
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
+                    labels = c("German", "French", "Italian","Romansh")) +
+  theme_minimal() +
+  labs(x = "Language", y = "", fill = "Language") +
+  theme(legend.position = "top")
+```
+```{r pressure, echo=FALSE}
+# Correlation
+library(weights)
+wtd.cor(x = yes$X6730, y = log(f), weight = as.vector(f))
+
+min_time_to_highway = read.csv("/Users/rloup/Documents/r_projects/vote_swiss_national_roads/min_time_to_highway_2024.csv")
+
+wtd.cor(x = residu_road, y = min_time_to_highway$t_min, weight = as.vector(f))
 ```
