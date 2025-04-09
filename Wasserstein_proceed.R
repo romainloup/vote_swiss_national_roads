@@ -15,23 +15,48 @@ dist_types = c("X", "Z", "f", "P", "w", "I")
 # --- Run RV function
 list_RV_W = RV2(dist_types,f)
 
+# list_RV_W$Y_list[[2]] = -list_RV_W$Y_list[[2]]
+# list_RV_W$Y_list[[3]] = -list_RV_W$Y_list[[3]]
+# list_RV_W$Y_list[[5]] = -list_RV_W$Y_list[[5]]
+# list_RV_W$Y_list[[6]] = -list_RV_W$Y_list[[6]]
+
+# german, ..., 1:dim(ch_aggregated_geolevels)[1]
+# --- German speakers vs french speakers
+german = which(ch_aggregated_geolevels$language == 1)
+french = which(ch_aggregated_geolevels$language == 2)
+italian = which(ch_aggregated_geolevels$language == 3)
+romansh = which(ch_aggregated_geolevels$language == 4)
+
 dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT")
 
+# --- Parameters
 # Type to compare
-val_1 = 5
-val_2 = 3
+val_1 = 6 # x
+val_2 = 6
+val_3 = 3
 factor_1 = 1
-factor_2 = 1
+factor_2 = 2
 nb_muni = 50
+
+select_lang = 1:dim(ch_aggregated_geolevels)[1] # Switzerland
+select_lang = german
+select_lang = french
+select_lang = italian
+select_lang = romansch
+# --- end parameters
 
 
 # Run graph
 {
-  filtered = as.data.frame(ch_aggregated_geolevels$swiss_data_muni.f)
+  filtered = as.data.frame(ch_aggregated_geolevels[select_lang,]$swiss_data_muni.f)
   names(filtered) = "f"
-  filtered$x = list_RV_W$Y_list[[val_1]][,factor_1]
-  filtered$y = list_RV_W$Y_list[[val_2]][,factor_2]
-  filtered$municipality = ch_aggregated_geolevels$NAME
+  filtered$x = list_RV_W$Y_list[[val_1]][select_lang,factor_1]
+  filtered$y = list_RV_W$Y_list[[val_2]][select_lang,factor_2]
+  
+  # filtered$x = x
+  # filtered$y = y
+  
+  filtered$municipality = ch_aggregated_geolevels[select_lang,]$NAME
   filtered = filtered[filtered$f > sort(filtered$f, decreasing = TRUE)[nb_muni+1], ]
   filtered = filtered[order(filtered$f, decreasing = TRUE),]
   
@@ -41,8 +66,12 @@ lambda_from_RV_2 = list_RV_W$eigen_val_list[[val_2]]$values
 prop_expl_1 = round(100*lambda_from_RV_1 / sum(lambda_from_RV_1), digits = 1 )[factor_1]
 prop_expl_2 = round(100*lambda_from_RV_2 / sum(lambda_from_RV_2), digits = 1 )[factor_2]
 
-x_axis = list_RV_W$Y_list[[val_1]][,factor_1]
-y_axis = list_RV_W$Y_list[[val_2]][,factor_2]
+x_axis = list_RV_W$Y_list[[val_1]][select_lang,factor_1]
+y_axis = list_RV_W$Y_list[[val_2]][select_lang,factor_2]
+
+# x_axis = x
+# y_axis = y
+
 x_lab = dist_types_names[val_1]
 y_lab = dist_types_names[val_2]
 
@@ -50,8 +79,8 @@ y_lab = dist_types_names[val_2]
 ggplot() +
   geom_vline(xintercept = 0, linetype="dashed") +
   geom_hline(yintercept = 0, linetype="dashed") +
-  geom_point(aes(x = x_axis, y = y_axis, size=f, color=mds_I$language),
-             alpha = magnif) +
+  geom_point(aes(x = x_axis, y = y_axis, size=f[select_lang], color=mds_I$language[select_lang]),
+             alpha = magnif[select_lang]) +
   ggrepel::geom_text_repel(aes(x = filtered$x, y = filtered$y, label = filtered$municipality),
                            box.padding = 0.5,   # Espace autour des étiquettes
                            point.padding = 0.3, # Espace autour des points
@@ -68,7 +97,7 @@ ggplot() +
 {
 # --- Regression
 # Régression pondérée 2ers facteurs MDS sur toutes les votations
-reg_model_w = lm(x_axis ~ y_axis, weights = f) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
+reg_model_w = lm(x_axis ~ y_axis, weights = f[select_lang]) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
 summary(reg_model_w)
 
 # Résidus
@@ -83,7 +112,7 @@ palDiv_w <- colorNumeric("PRGn", domain = scale_range_w)
 rev_palDiv_w <- colorNumeric("PRGn", domain = scale_range_w, reverse = TRUE)
 
 
-leaflet(ch_aggregated) %>%
+leaflet(ch_aggregated[select_lang,]) %>%
   addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
   # addProviderTiles(providers$CartoDB.DarkMatter) %>%
   setView(lat=46.637785, lng=8.2 , zoom=7) %>%
@@ -100,7 +129,7 @@ leaflet(ch_aggregated) %>%
       fillOpacity = 0.7,
       bringToFront = TRUE,
       sendToBack = TRUE),
-    label = paste0(ch_aggregated$NAME, ": ", round(residuals_w, 2)),
+    label = paste0(ch_aggregated$NAME[select_lang], ": ", round(residuals_w, 2)),
     smoothFactor = 0.2,
     # group = "MDS fac. 1",
   ) %>%
@@ -146,3 +175,41 @@ leaflet(ch_aggregated) %>%
     opacity = 0.9
   )
 }
+
+# Corrélation pondérée entre les résidus
+weighted.cor <- function(u, v, w) {
+  wm <- sum(w)
+  mu_u <- sum(w * u) / wm
+  mu_v <- sum(w * v) / wm
+  cov_uv <- sum(w * (u - mu_u) * (v - mu_v)) / wm
+  sd_u <- sqrt(sum(w * (u - mu_u)^2) / wm)
+  sd_v <- sqrt(sum(w * (v - mu_v)^2) / wm)
+  cov_uv / (sd_u * sd_v)
+}
+
+
+# dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT")
+# Régression pondérée 2ers facteurs MDS sur toutes les votations
+z = list_RV_W$Y_list[[val_3]][select_lang,factor_1]
+x = list_RV_W$Y_list[[val_1]][select_lang,factor_1]
+reg_model_x = lm(x ~ z, weights = f[select_lang]) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
+# Résidus
+residuals_x = x - predict(reg_model_x)
+
+# Reg 2
+y = list_RV_W$Y_list[[val_2]][select_lang,factor_1]
+reg_model_y = lm(y ~ z, weights = f[select_lang])
+# Résidus
+residuals_y = y - predict(reg_model_y)
+
+partial_cor <- weighted.cor(residuals_x, residuals_y, f[select_lang])
+partial_cor
+
+weighted.cor(x, y, f[select_lang])
+
+plot(x,y)
+
+# mettre dans matrice de corrélation 2 à 2 -> faire ACP là-dessus voir si les variables sont dépendantes entre elles
+# reg multiple
+# prédire 1er fact pol
+# WLS pondérée

@@ -1349,6 +1349,9 @@ ggplot(as.data.frame(mds_to_plot), aes(x = langue, y = V1, fill = as.character(l
   labs(x = "Language", y = "", fill = "Language") +
   theme(legend.position = "top")
 ```
+
+Corrélation
+
 ```{r pressure, echo=FALSE}
 # Correlation
 library(weights)
