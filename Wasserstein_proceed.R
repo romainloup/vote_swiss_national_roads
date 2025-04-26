@@ -10,10 +10,11 @@ time_mat[,1] = NULL
 DZ = as.matrix((time_mat + t(time_mat)) / 2) ^ 2 # road time
 KZ = -0.5 * diag(sqrt(f)) %*% H %*% DZ %*% t(H) %*% diag(sqrt(f)) # spatial kernel, time
 
-dist_types = c("X", "Z", "f", "P", "w", "I")
+dist_types = c("X", "Z", "f", "P", "w", "I", "S")
 
 # --- Run RV function
 list_RV_W = RV2(dist_types,f)
+list_RV_W_S = RV2(dist_types,f)
 
 # list_RV_W$Y_list[[2]] = -list_RV_W$Y_list[[2]]
 # list_RV_W$Y_list[[3]] = -list_RV_W$Y_list[[3]]
@@ -27,16 +28,16 @@ french = which(ch_aggregated_geolevels$language == 2)
 italian = which(ch_aggregated_geolevels$language == 3)
 romansh = which(ch_aggregated_geolevels$language == 4)
 
-dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT")
+dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT", "Sound")
 
 # --- Parameters
 # Type to compare
-val_1 = 6 # x
-val_2 = 6
+val_1 = 1 # x
+val_2 = 7
 val_3 = 3
 factor_1 = 1
-factor_2 = 2
-nb_muni = 50
+factor_2 = 1
+nb_muni = 300
 
 select_lang = 1:dim(ch_aggregated_geolevels)[1] # Switzerland
 select_lang = german
@@ -50,8 +51,8 @@ select_lang = romansch
 {
   filtered = as.data.frame(ch_aggregated_geolevels[select_lang,]$swiss_data_muni.f)
   names(filtered) = "f"
-  filtered$x = list_RV_W$Y_list[[val_1]][select_lang,factor_1]
-  filtered$y = list_RV_W$Y_list[[val_2]][select_lang,factor_2]
+  filtered$x = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+  filtered$y = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
   
   # filtered$x = x
   # filtered$y = y
@@ -60,14 +61,14 @@ select_lang = romansch
   filtered = filtered[filtered$f > sort(filtered$f, decreasing = TRUE)[nb_muni+1], ]
   filtered = filtered[order(filtered$f, decreasing = TRUE),]
   
-lambda_from_RV_1 = list_RV_W$eigen_val_list[[val_1]]$values
-lambda_from_RV_2 = list_RV_W$eigen_val_list[[val_2]]$values
+lambda_from_RV_1 = list_RV_W_S$eigen_val_list[[val_1]]$values
+lambda_from_RV_2 = list_RV_W_S$eigen_val_list[[val_2]]$values
 
 prop_expl_1 = round(100*lambda_from_RV_1 / sum(lambda_from_RV_1), digits = 1 )[factor_1]
 prop_expl_2 = round(100*lambda_from_RV_2 / sum(lambda_from_RV_2), digits = 1 )[factor_2]
 
-x_axis = list_RV_W$Y_list[[val_1]][select_lang,factor_1]
-y_axis = list_RV_W$Y_list[[val_2]][select_lang,factor_2]
+x_axis = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+y_axis = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
 
 # x_axis = x
 # y_axis = y
@@ -190,14 +191,14 @@ weighted.cor <- function(u, v, w) {
 
 # dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT")
 # Régression pondérée 2ers facteurs MDS sur toutes les votations
-z = list_RV_W$Y_list[[val_3]][select_lang,factor_1]
-x = list_RV_W$Y_list[[val_1]][select_lang,factor_1]
+z = list_RV_W_S$Y_list[[val_3]][select_lang,factor_1]
+x = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
 reg_model_x = lm(x ~ z, weights = f[select_lang]) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
 # Résidus
 residuals_x = x - predict(reg_model_x)
 
 # Reg 2
-y = list_RV_W$Y_list[[val_2]][select_lang,factor_1]
+y = list_RV_W_S$Y_list[[val_2]][select_lang,factor_1]
 reg_model_y = lm(y ~ z, weights = f[select_lang])
 # Résidus
 residuals_y = y - predict(reg_model_y)
@@ -206,6 +207,19 @@ partial_cor <- weighted.cor(residuals_x, residuals_y, f[select_lang])
 partial_cor
 
 weighted.cor(x, y, f[select_lang])
+
+corr_mat_w = matrix(data = NA, 7,7)
+for (i in 1:7) {
+  x = list_RV_W_S$Y_list[[i]][select_lang,factor_1]
+  for (j in 1:6) {
+    # if (i!=j) {
+      y = list_RV_W_S$Y_list[[j]][select_lang,factor_1]
+    # }
+    corr_mat_w[i,j] = weighted.cor(x, y, f[select_lang])
+  }
+}
+rownames(corr_mat_w) = dist_types_names
+colnames(corr_mat_w) = dist_types_names
 
 plot(x,y)
 
