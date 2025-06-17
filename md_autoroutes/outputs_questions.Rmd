@@ -31,6 +31,49 @@ sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$lang
 sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$Typologie.urbain.rural == 1)])
 sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$Typologie.urbain.rural == 2)])
 sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$Typologie.urbain.rural == 3)])
+
+# Typology: Center, Urban, Intermediate, Rural
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$nouvelle_typo == 1)])
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$nouvelle_typo == 2)])
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$nouvelle_typo == 3)])
+sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$nouvelle_typo == 4)])
+
+
+# median
+library(spatstat)
+# region
+weighted.median(ch_aggregated_geolevels$yes.X6730[which(ch_aggregated_geolevels$nouvelle_typo == 4)],
+ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$nouvelle_typo == 4)], na.rm = TRUE)
+# langue
+weighted.median(ch_aggregated_geolevels$yes.X6730[which(ch_aggregated_geolevels$language == 1)],
+ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$language == 1)], na.rm = TRUE)
+
+dim(ch_aggregated_geolevels[which(ch_aggregated_geolevels$language == 1 ),])
+dim(ch_aggregated_geolevels[which(ch_aggregated_geolevels$yes.X6730 > 0.5 & ch_aggregated_geolevels$language == 1),])
+
+#Moyenne pondérée
+sample_f = ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$road_project_n > 0 )]/sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$road_project_n > 0 )])
+
+sample_yes = ch_aggregated_geolevels$yes.X6730[which(ch_aggregated_geolevels$road_project_n > 0 )]
+weighted.mean(sample_yes, sample_f)
+
+#Moyenne pondérée typologies
+sample_f = ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$nouvelle_typo == 4 )]/sum(ch_aggregated_geolevels$swiss_data_muni.f[which(ch_aggregated_geolevels$nouvelle_typo == 4 )])
+
+sample_yes = ch_aggregated_geolevels$yes.X6730[which(ch_aggregated_geolevels$nouvelle_typo == 4 )]
+weighted.mean(sample_yes, sample_f)
+
+#Moyenne pondérée par pojet
+condition = ch_aggregated$road_project_indiv == 5 # direct 1 bern 2 ge 3 st.g 4 schaff 5 basel
+condition = ch_aggregated$road_project_indiv_n == 5
+condition = ch_aggregated$road_project_indiv_n2 == 5
+condition = ch_aggregated_geolevels$language == 4
+
+sample_f = ch_aggregated_geolevels$swiss_data_muni.f[which(condition)]/sum(ch_aggregated_geolevels$swiss_data_muni.f[which(condition)])
+sample_yes = ch_aggregated_geolevels$yes.X6730[which(condition)]
+length(sample_yes)
+weighted.mean(sample_yes, sample_f)
+
 ```
 
 ### Étape I : carte descriptive
@@ -77,6 +120,12 @@ rev_my_palette = colorNumeric(
   palette = colorRampPalette(c("#008837","#a6dba0", "#f7f7f7", "#c2a5cf", "#7b3294"))(100), # Transition douce entre vert et violet
   domain = NULL
 )
+
+my_palette_langue = colorNumeric(
+  palette = colorRampPalette(c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3")),
+  domain = NULL
+)
+ch_langue$color = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3")
 
 # palDiv = colorNumeric("PRGn", NULL) # color palette
 leaflet(ch_aggregated) %>%
@@ -201,12 +250,24 @@ communes_centres
 #   )
 
 # v2
-
+library(leaflegend)
 # Trier les données par rayon (décroissant)
 dataSetCircles = communes_centres
 dataSetCircles$f = f
 dataSetCircles$vote = yes$X6730
 dataSetCircles = dataSetCircles[order(-f^0.57), ]
+
+addLegendCustom <- function(map, colors, labels, sizes, opacity = 0.5){
+  colorAdditions <- paste0(colors, "; border-radius: 50%; width:", sizes, "px; height:", sizes, "px")
+
+  labelAdditions <- paste0("<div style='display: inline-block;height: ", 
+                           sizes, "px;margin-top: 4px;line-height: ", sizes, "px;'>", 
+                           labels, "</div>")
+
+  return(addLegend(map, colors = colorAdditions, 
+                   labels = labelAdditions, opacity = opacity))
+}
+
 
 leaflet(ch_aggregated) %>%
   # addProviderTiles(providers$CartoDB.Positron) %>%
@@ -214,6 +275,13 @@ leaflet(ch_aggregated) %>%
   addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
   # addProviderTiles(providers$CartoDB.DarkMatter) %>%
   setView(lat = 46.637785, lng = 8.2, zoom = 7) %>%
+  addPolygons(
+    data = ch_langue,
+    weight = 1,
+    fillColor = "#dddddd",
+    fillOpacity = 0,
+    color = ch_langue$color
+  ) %>%
   # Ajout des lacs
   addPolygons(
     data = lakes,
@@ -265,11 +333,14 @@ leaflet(ch_aggregated) %>%
     pal = rev_my_palette,
     values = round(100*dataSetCircles$vote, 2),
     position = "bottomright",
-    title = "Oui (%)",
+    title = "Yes (%)",
     # labFormat = labelFormat(suffix = "%"),
     labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
     opacity = 0.9
-  )
+  ) %>%
+  # Ajout de la légende
+  addLegendCustom(colors = c("blue", "blue", "red"), 
+                  labels = c("A", "B", "C"), sizes = c(10, 20, 40))
 
 ```
 
@@ -609,7 +680,10 @@ geoLevels = geoLevels[-which(geoLevels[, 2] == "Oberhünigen"),]
 dim(geoLevels)
 # View(geoLevels)
 
-t.test(residu_road[which(geoLevels$`Typologie urbain-rural` == 3)], mu = 0)
+t.test(residu_road[which(geoLevels$`Typologie urbain-rural` == 1)], mu = 0)
+
+t.test(residu_road[which(as.character(ch_aggregated_geolevels$nouvelle_typo) == 4)], mu = 0)
+length(which((as.character(ch_aggregated_geolevels$nouvelle_typo) == 3)))
 ```
 
 ```{r pressure, echo=FALSE}
@@ -696,7 +770,11 @@ leaflet(ch_aggregated) %>%
 9 categories
 
 ```{r pressure, echo=FALSE}
+ch_filtered = ch_aggregated_geolevels[ch_aggregated_geolevels$swiss_data_muni.f >= sort(ch_aggregated_geolevels$swiss_data_muni.f, decreasing = TRUE)[20], ]
+
 palCal <- colorFactor(palette = "Set3", domain = unique(geoLevels$`Typologie des communes (9 types)`))
+palCal <- colorFactor(palette = "Set3", domain = unique(ch_aggregated_geolevels$nouvelle_typo), reverse = TRUE)
+
 palette_9 <- c(
   "#edf8fb", "#b2e2e2", "#66c2a4",  # Catégorie 1 (pâle à foncé)
   "#fee6ce", "#fdae6b", "#e6550d",  # Catégorie 2 (pâle à foncé)
@@ -722,13 +800,21 @@ labels_typology <- c(
   "Peripheral rural municipality"
 )
 
-leaflet(ch_aggregated) %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
+labels_typology <- c(
+  "Central Cities",
+  "Urban municipalities",
+  "Multi-oriented",
+  "Rural"
+)
+
+leaflet(ch_aggregated_geolevels) %>%
+  addProviderTiles(providers$CartoDB.PositronNoLabels) %>%
   # addProviderTiles(providers$CartoDB.DarkMatter) %>%
   setView( lat=46.637785, lng=8.2 , zoom=7) %>%
   # municipality polygons
   addPolygons(
-    fillColor = ~palCal(geoLevels$`Typologie des communes (9 types)`),
+    # fillColor = ~palCal(geoLevels$`Typologie des communes (9 types)`),
+    fillColor = ~palCal(ch_aggregated_geolevels$nouvelle_typo),
     fillOpacity = 0.9,
     color = "white",
     weight = 0.1,
@@ -740,7 +826,8 @@ leaflet(ch_aggregated) %>%
       bringToFront = TRUE,
       sendToBack = TRUE),
     # label = paste0(ch_aggregated$NAME, ": ", round(residu_road, 2)),
-    label = ~paste0(geoLevels$`Nom de la commune`, ": ", geoLevels$`Typologie des communes (9 types)`),
+    # label = ~paste0(geoLevels$`Nom de la commune`, ": ", geoLevels$`Typologie des communes (9 types)`),
+    label = ~paste0(ch_aggregated$NAME, ": ", ch_aggregated_geolevels$nouvelle_typo),
     smoothFactor = 0.2,
     # group = "MDS fac. 1",
   ) %>%
@@ -781,6 +868,8 @@ leaflet(ch_aggregated) %>%
     overlayGroups = c("lakes"),
     options = layersControlOptions(collapsed = TRUE)
   ) %>%
+  addLabelOnlyMarkers(data=communes_centres_sorted[1:20,], ~longitude, ~latitude, label =  ~as.character(NAME), 
+                      labelOptions = labelOptions(noHide = T, direction = 'top', textOnly = T))  %>%
   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = F)) %>%
   addLegend(
     colors = c("#d47c17", "#d44317"),
@@ -790,13 +879,27 @@ leaflet(ch_aggregated) %>%
   ) %>%
   # Ajout de la légende
   addLegend(
-    colors = palCal(sort(unique(geoLevels$`Typologie des communes (9 types)`))),
+    # colors = palCal(sort(unique(geoLevels$`Typologie des communes (9 types)`))),
+    colors = palCal(sort(unique(ch_aggregated_geolevels$nouvelle_typo))),
     labels = labels_typology,
     position = "bottomright",
     title = "BFS typology",
     opacity = 0.9
   )
 ```
+```{r pressure, echo=FALSE}
+library(dplyr)
+
+result <- ch_aggregated_geolevels %>%
+  group_by(`Typologie.des.communes..9.types.`) %>%
+  summarise(
+    moy_ponderee_yesX6730 = sum(yes.X6730 * swiss_data_muni.f, na.rm = TRUE) / 
+                             sum(swiss_data_muni.f[!is.na(yes.X6730)], na.rm = TRUE)
+  )
+
+View(result)
+```
+
 
 ```{r pressure, echo=FALSE}
 t.test(residu_road[which(geoLevels$`Typologie des communes (9 types)` == 33)], mu = 0)

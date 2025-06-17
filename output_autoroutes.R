@@ -95,6 +95,20 @@ mds_plot = ggplot() +
   theme(legend.title = element_markdown(lineheight = 1.2))
 mds_plot
 
+
+# Classes spécifiques
+ch_aggregated_geolevels <- ch_aggregated_geolevels %>%
+  mutate(
+    nouvelle_typo = case_when(
+      `Typologie.des.communes..25.types.` %in% c(111, 121) ~ 1,
+      `Typologie.des.communes..25.types.` %in% c(112, 113, 122, 123, 134, 136, 137) ~ 2,
+      `Typologie.des.communes..25.types.` %in% c(216, 217, 226, 227, 235, 236, 237) ~ 3,
+      `Typologie.des.communes..25.types.` %in% c(314, 316, 317, 325, 326, 327, 334, 335, 338) ~ 4,
+      TRUE ~ NA_real_
+    )
+  )
+
+
 # Boxplot pondéré
 library(ggplot2)
 library(ggrepel)
@@ -107,8 +121,17 @@ mds_outliers = mds %>%
 
 swiss_data_muni$language_region = detailed_language_2024$language_region
 swiss_data_muni$language_region = ch_aggregated_geolevels$Typologie.urbain.rural
+swiss_data_muni$language_region = ch_aggregated_geolevels$nouvelle_typo
 swiss_data_muni$outlier = mds_outliers$outlier
 swiss_data_muni$f = f
+
+swiss_data_muni$language_region <- factor(
+  swiss_data_muni$language_region,
+  levels = c(1, 2, 3, 4),
+  labels = c("core cities", "suburban municipalities", "periburban municipalities", "rural municipalities")
+)
+
+# swiss_data_muni$language_region <- factor(swiss_data_muni$language_region, levels=c("core cities", "suburban municipalities", "periburban municipalities", "rural municipalities"))
 
 # Ajouter les coordonnées jitterées dans les données pour un alignement parfait
 swiss_data_muni <- swiss_data_muni %>%
@@ -142,20 +165,30 @@ ggplot(swiss_data_muni, aes(x = language_region, y = residu_road, fill = as.char
   # Palette de couleurs pour le remplissage
   # scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
   #                   labels = c("German", "French", "Italian", "Romansh")) +
-  scale_fill_manual(values = c("#8dd3c7", "#ffffb3", "#bebada"),
-                    labels = c("Urban", "Intermediate", "Rural")) +
+  # scale_fill_manual(values = c("#8dd3c7", "#ffffb3", "#bebada"),
+  #                   labels = c("Urban", "Intermediate", "Rural")) +
+  # scale_fill_manual(values = c("#8dd3c7", "#ffffb3", "#bebada", "#fb8072"),
+  #                   labels = c("Central cities", "Urban municipalities", "Multi-oriented", "Rural")) +
+  
+  scale_fill_manual(values = c("#fb8072", "#ffffb3", "#8dd3c7", "#bebada"),
+                    labels = c("Central cities", "Urban municipalities", "Multi-oriented", "Rural")) +
+  
+  # scale_fill_manual(values = c("#fb8072", "#bebada", "#ffffb3", "#8dd3c7"),
+  #                   labels = c("core cities", "surban municipalities", "periburban municipalities", "rural municipalities")) +
   
   # scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
-  scale_color_manual(values = c("#8dd3c7", "#ffffb3", "#bebada"), guide = "none") +
+  # scale_color_manual(values = c("#8dd3c7", "#ffffb3", "#bebada", "#fb8072"), guide = "none") +
+  scale_color_manual(values = c("#fb8072", "#ffffb3", "#8dd3c7","#bebada"), guide = "none") +
   
   # Échelle pour la taille des points
-  scale_size_continuous(name = "Taille de la commune", range = c(1, 10)) +
+  scale_size_continuous(name = "municipality size", range = c(1, 10)) +
   # Ligne de référence
-  geom_hline(yintercept = 50, color = "red", linetype = "dashed", size = 0.7) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed", size = 0.7) +
   # Design moderne
   theme_minimal(base_size = 11) +
   theme(
-    legend.position = "top",
+    legend.position = "bottom",
+    # legend.position="none",
     panel.grid.major = element_line(color = "gray90"),
     panel.grid.minor = element_blank(),
     axis.title.x = element_text(margin = margin(t = 10))
@@ -163,16 +196,17 @@ ggplot(swiss_data_muni, aes(x = language_region, y = residu_road, fill = as.char
   labs(
     # title = "Résultats des votes par région linguistique",
     # subtitle = "Distribution des résultats en pourcentage de votes 'oui' par langue, pondérés par la taille des communes",
-    # x = "Linguistic region",
-    x = "Urban-rural BFS 3-degree typology",
+    # x = "linguistic region",
+    # x = "Urban-rural BFS 3-degree typology",
+    x = "urban-rural 4-degree typology",
     # y = "'yes' pourcentage",
-    y = "Residuals of 'yes' pourcentage",
-    # fill = "Spoken language"
-    fill = "Typology"
+    y = "residuals of 'YES' pourcentage",
+    fill = "spoken language"
+    # fill = "typology"
   )
-# + scale_x_discrete(labels = c("German", "French", "Italian", "Romansh"))
 
-ggsave("/Users/rloup/Library/CloudStorage/OneDrive-UniversitédeLausanne/routes_nationales/images/weighted_boxplot_typology_residuals.png", width = 9, height = 8)
+
+ggsave("images/weighted_boxplot_regio_residuals.pdf", width = 9, height = 8)
 
 
 library(readxl)
