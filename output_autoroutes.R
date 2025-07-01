@@ -163,22 +163,22 @@ ggplot(swiss_data_muni, aes(x = language_region, y = residu_road, fill = as.char
     max.overlaps = Inf
   ) +
   # Palette de couleurs pour le remplissage
-  # scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
-  #                   labels = c("German", "French", "Italian", "Romansh")) +
+  scale_fill_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"),
+                    labels = c("German", "French", "Italian", "Romansh")) +
   # scale_fill_manual(values = c("#8dd3c7", "#ffffb3", "#bebada"),
   #                   labels = c("Urban", "Intermediate", "Rural")) +
   # scale_fill_manual(values = c("#8dd3c7", "#ffffb3", "#bebada", "#fb8072"),
   #                   labels = c("Central cities", "Urban municipalities", "Multi-oriented", "Rural")) +
   
-  scale_fill_manual(values = c("#fb8072", "#ffffb3", "#8dd3c7", "#bebada"),
-                    labels = c("Central cities", "Urban municipalities", "Multi-oriented", "Rural")) +
+  # scale_fill_manual(values = c("#fb8072", "#ffffb3", "#8dd3c7", "#bebada"),
+  #                   labels = c("Central cities", "Urban municipalities", "Multi-oriented", "Rural")) +
   
   # scale_fill_manual(values = c("#fb8072", "#bebada", "#ffffb3", "#8dd3c7"),
   #                   labels = c("core cities", "surban municipalities", "periburban municipalities", "rural municipalities")) +
   
-  # scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
+  scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"), guide = "none") +
   # scale_color_manual(values = c("#8dd3c7", "#ffffb3", "#bebada", "#fb8072"), guide = "none") +
-  scale_color_manual(values = c("#fb8072", "#ffffb3", "#8dd3c7","#bebada"), guide = "none") +
+  # scale_color_manual(values = c("#fb8072", "#ffffb3", "#8dd3c7","#bebada"), guide = "none") +
   
   # Échelle pour la taille des points
   scale_size_continuous(name = "municipality size", range = c(1, 10)) +
@@ -196,17 +196,17 @@ ggplot(swiss_data_muni, aes(x = language_region, y = residu_road, fill = as.char
   labs(
     # title = "Résultats des votes par région linguistique",
     # subtitle = "Distribution des résultats en pourcentage de votes 'oui' par langue, pondérés par la taille des communes",
-    # x = "linguistic region",
+    x = "linguistic region",
     # x = "Urban-rural BFS 3-degree typology",
-    x = "urban-rural 4-degree typology",
-    # y = "'yes' pourcentage",
-    y = "residuals of 'YES' pourcentage",
+    # x = "urban-rural 4-degree typology",
+    # y = "'yes' percentage",
+    y = "residuals of 'YES' percentage",
     fill = "spoken language"
     # fill = "typology"
   )
 
 
-ggsave("images/weighted_boxplot_regio_residuals.pdf", width = 9, height = 8)
+ggsave("images/weighted_boxplot_lang_residuals.pdf", width = 9, height = 8)
 
 
 library(readxl)

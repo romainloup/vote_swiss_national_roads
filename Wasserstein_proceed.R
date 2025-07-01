@@ -33,11 +33,11 @@ dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT", "Sound")
 # --- Parameters
 # Type to compare
 val_1 = 1 # x
-val_2 = 7
+val_2 = 5
 val_3 = 3
 factor_1 = 1
 factor_2 = 1
-nb_muni = 300
+nb_muni = 50
 
 select_lang = 1:dim(ch_aggregated_geolevels)[1] # Switzerland
 select_lang = german
