@@ -147,6 +147,7 @@ KX_theme = -0.5 * diag(sqrt(f)) %*% H %*% DX_theme %*% t(H) %*% diag(sqrt(f)) # 
 
 test = mds_fun_Y2(f, KX_theme, ch_aggregated_geolevels)
 ggsave(paste0("wasserstein/mds_theme", i, ".png"), width = 8, height = 9)
+ggsave(paste0("wasserstein/mds_theme", i, ".pdf"), width = 8, height = 9)
 }
 
 
@@ -177,14 +178,14 @@ mds_fun_Y2 = function(fi, K, ch){
   mds$f = fi
   mds$voters = ch$swiss_data_muni.f
   
-  mds_filtered = mds[mds$voters > sort(mds$voters, decreasing = TRUE)[1000], ]
+  mds_filtered = mds[mds$voters > sort(mds$voters, decreasing = TRUE)[30], ]
   
   propDeltaPC = round(100*lambda / sum(lambda), digits = 1 )
   
   # print(propDeltaPC)
   magnif = 0.2+0.5*(log(fi)-min(log(fi)))/(max(log(fi))-min(log(fi))) # defines a magnification factor for the object weights (here from 0.5 to 2)
-  xlab = paste("Factor 3, inertia explained =",propDeltaPC[1],"%")
-  ylab = paste("Factor 4, inertia explained =",propDeltaPC[2],"%")
+  xlab = paste("Factor 1, inertia explained =",propDeltaPC[1],"%")
+  ylab = paste("Factor 2, inertia explained =",propDeltaPC[2],"%")
   
   # magnif = magnif[conditionSample]
   mds_plot = ggplot() +
@@ -207,27 +208,6 @@ mds_fun_Y2 = function(fi, K, ch){
 }
 
 
-
-
-
-
-
-Z_pre_canton = data.frame(1:n, as.factor(ch_aggregated_geolevels$KANTONSNUM))
-names(Z_pre_canton) = c("commune", "canton")
-Z_pre_canton = Z_pre_canton %>%
-  mutate(value = 1) %>%
-  pivot_wider(names_from = canton, values_from = value, values_fill = list(value = 0), names_prefix = "canton")
-Z_canton = as.matrix(Z_pre_canton[,-1])
-colnames(Z_canton) = unique(geoLevels$Canton)
-
-rho_canton = t(Z_canton)%*%f
-R = diag(as.vector(rho_canton))
-S = diag(as.vector(sqrt(1/rho_canton)))%*%t(Z_canton)%*%diag(sqrt(f))
-S%*%t(S)
-
-# K_tild = S%*%KX%*%t(S)
-
-KX_tild = S%*%KX%*%t(S)
 
 # --- import and compute vote distance kernel
 
@@ -293,6 +273,7 @@ write.csv(dist_mat, "national_vote_distance.csv", row.names = F)
 
 KX_nat = -0.5 * diag(sqrt(f)) %*% H %*% dist_mat %*% t(H) %*% diag(sqrt(f)) # political kernel
 
+mds_national = mds_fun_Y2(f, KX_nat, ch_aggregated_geolevels)
 
 # --- second distance ---
 # correlation kernel between votes
@@ -324,13 +305,67 @@ for (i in 1:cols) {
 
 cor_mat <- as.data.frame(cor_mat)
 
+dist_mat_obj = as.matrix(1-cor_mat^2)
+f_obj = rep(1/381, 381)
+H_obj = as.matrix(diag(381) - rep(1, 381) %*% t(f_obj)) # centering matrix
+
+K_obj = -0.5 * diag(sqrt(f_obj)) %*% H_obj %*% dist_mat_obj %*% t(H_obj) %*% diag(sqrt(f_obj)) # political kernel
 
 
-rho_vote = rep(1/cols,cols)
-R_vote = diag(as.vector(rho_vote))
-S = diag(as.vector(sqrt(1/rho_vote)))%*%t(Z_canton)%*%diag(sqrt(f))
-S%*%t(S)
+mds_fun_Y3 = function(fi, K, name, language){
+  
+  eigen_val <- eigen(K)
+  U <- eigen_val$vectors
+  lambda <- eigen_val$values
+  
+  Y <- diag(1/sqrt(fi)) %*% U %*% diag(sqrt(lambda))
+  
+  mds = as.data.frame(Y[,1:2])
+  mds$V1 = Re(mds$V1)
+  mds$V2 = Re(mds$V2)
+  
+  mds$commune = name
+  
+  
+  if (missing(language)) {
+    mds$langue = "#c1c1c1"
+  } else {
+    mds$langue = language
+  }
+  
+  mds$f = fi
+  
+  mds_filtered = mds[mds$f > sort(mds$f, decreasing = TRUE)[50], ]
+  
+  propDeltaPC = round(100*lambda / sum(lambda), digits = 1 )
+  
+  # print(propDeltaPC)
+  magnif = 0.2+0.5*(log(fi)-min(log(fi)))/(max(log(fi))-min(log(fi))) # defines a magnification factor for the object weights (here from 0.5 to 2)
+  xlab = paste("Factor 1, inertia explained =",propDeltaPC[1],"%")
+  ylab = paste("Factor 2, inertia explained =",propDeltaPC[2],"%")
+  
+  # magnif = magnif[conditionSample]
+  mds_plot = ggplot() +
+    geom_vline(xintercept = 0,linetype="dashed") +
+    geom_hline(yintercept = 0, linetype="dashed") +
+    geom_point(aes(x = -mds[,1], y = -mds[,2], size=fi, color=mds$langue),
+               alpha = magnif) +
+    # geom_point(aes(x = mds[,1], y = -mds[,2], color=mds$langue)) +
+    geom_text(aes(x = -mds_filtered[,1], y = -mds_filtered[,2], label = mds_filtered$commune)) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
+                       labels = c("German", "French", "Italian","Romansh")) +
+    labs(x = xlab, y = ylab) +
+    # labs(size = paste0("Reg. weight ", expression(italic("f"))), color = "Language") +
+    labs(size = "Reg. weight *f*", color = "Language") +
+    scale_size_continuous(range = c(1, 8)) +
+    theme_minimal() +
+    theme(legend.title = element_markdown(lineheight = 1.2))
+  
+  return(list(eigen_val=eigen_val,mds=mds,mds_plot=mds_plot))
+}
+test = mds_fun_Y3(f_obj, K_obj, names(yes[,3:383]), as.character(voteInfo$theme1_id[1:381]))
 
-# K_tild = S%*%KX%*%t(S)
+# main themes
+themeVotesNames[which(is.na(themeVotesNames$Parent)),]$Name_en
 
-KX_tild = S%*%KX%*%t(S)
+test$mds_plot
