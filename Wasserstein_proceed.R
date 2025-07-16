@@ -52,6 +52,7 @@ select_lang = romansch
   filtered = as.data.frame(ch_aggregated_geolevels[select_lang,]$swiss_data_muni.f)
   names(filtered) = "f"
   filtered$x = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+  filtered$x = test$mds$V1
   filtered$y = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
   
   # filtered$x = x
@@ -65,15 +66,18 @@ lambda_from_RV_1 = list_RV_W_S$eigen_val_list[[val_1]]$values
 lambda_from_RV_2 = list_RV_W_S$eigen_val_list[[val_2]]$values
 
 prop_expl_1 = round(100*lambda_from_RV_1 / sum(lambda_from_RV_1), digits = 1 )[factor_1]
+prop_expl_1 = 49.9
 prop_expl_2 = round(100*lambda_from_RV_2 / sum(lambda_from_RV_2), digits = 1 )[factor_2]
 
 x_axis = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+x_axis = test$mds$V1
 y_axis = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
 
 # x_axis = x
 # y_axis = y
 
 x_lab = dist_types_names[val_1]
+x_lab = "Pol eco"
 y_lab = dist_types_names[val_2]
 
 # Graphique
