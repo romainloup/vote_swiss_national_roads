@@ -32,8 +32,8 @@ dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT", "Sound")
 
 # --- Parameters
 # Type to compare
-val_1 = 1 # x
-val_2 = 5
+val_1 = 1 # x 
+val_2 = 2
 val_3 = 3
 factor_1 = 1
 factor_2 = 1
@@ -52,7 +52,7 @@ select_lang = romansch
   filtered = as.data.frame(ch_aggregated_geolevels[select_lang,]$swiss_data_muni.f)
   names(filtered) = "f"
   filtered$x = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
-  filtered$x = test$mds$V1
+  # filtered$x = test$mds$V1
   filtered$y = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
   
   # filtered$x = x
@@ -70,7 +70,7 @@ prop_expl_1 = 49.9
 prop_expl_2 = round(100*lambda_from_RV_2 / sum(lambda_from_RV_2), digits = 1 )[factor_2]
 
 x_axis = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
-x_axis = test$mds$V1
+# x_axis = test$mds$V1
 y_axis = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
 
 # x_axis = x

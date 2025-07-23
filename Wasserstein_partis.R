@@ -207,6 +207,10 @@ mds_fun_Y2 = function(fi, K, ch){
   return(list(eigen_val=eigen_val,mds=mds,mds_plot=mds_plot))
 }
 
+mds_wealth_ot = mds_fun_Y2(f, KI, ch_aggregated_geolevels)
+mds_wealth
+ggsave("wasserstein/mds_wealth.png", width = 9, height = 8)
+ggsave("wasserstein/mds_wealth.pdf", width = 9, height = 8)
 
 
 # --- import and compute vote distance kernel
