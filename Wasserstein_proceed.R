@@ -11,10 +11,13 @@ DZ = as.matrix((time_mat + t(time_mat)) / 2) ^ 2 # road time
 KZ = -0.5 * diag(sqrt(f)) %*% H %*% DZ %*% t(H) %*% diag(sqrt(f)) # spatial kernel, time
 
 dist_types = c("X", "Z", "f", "P", "w", "I", "S")
+dist_types = c("X", "Z", "f", "P", "_wealth1", "_wealth2", "_OT1", "_OT2")
+dist_types = c("_wealth1", "_OT1")
 
 # --- Run RV function
 list_RV_W = RV2(dist_types,f)
 list_RV_W_S = RV2(dist_types,f)
+list_RV_W_S2 = RV2(dist_types,f)
 
 # list_RV_W$Y_list[[2]] = -list_RV_W$Y_list[[2]]
 # list_RV_W$Y_list[[3]] = -list_RV_W$Y_list[[3]]
@@ -29,12 +32,14 @@ italian = which(ch_aggregated_geolevels$language == 3)
 romansh = which(ch_aggregated_geolevels$language == 4)
 
 dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT", "Sound")
+dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT1", "OT2")
+
 
 # --- Parameters
 # Type to compare
-val_1 = 1 # x 
-val_2 = 2
-val_3 = 3
+val_1 = 5 # x 
+val_2 = 6
+val_3 = 4
 factor_1 = 1
 factor_2 = 1
 nb_muni = 50
@@ -49,11 +54,20 @@ select_lang = romansch
 
 # Run graph
 {
+  x_axis = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+  x_axis = x_axis/sum(x_axis)
+  y_axis = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
+  y_axis = y_axis/sum(y_axis)
+  
   filtered = as.data.frame(ch_aggregated_geolevels[select_lang,]$swiss_data_muni.f)
   names(filtered) = "f"
-  filtered$x = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+  # filtered$x = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+  # # filtered$x = test$mds$V1
+  # filtered$y = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
+  
+  filtered$x = x_axis
   # filtered$x = test$mds$V1
-  filtered$y = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
+  filtered$y = y_axis
   
   # filtered$x = x
   # filtered$y = y
@@ -66,19 +80,21 @@ lambda_from_RV_1 = list_RV_W_S$eigen_val_list[[val_1]]$values
 lambda_from_RV_2 = list_RV_W_S$eigen_val_list[[val_2]]$values
 
 prop_expl_1 = round(100*lambda_from_RV_1 / sum(lambda_from_RV_1), digits = 1 )[factor_1]
-prop_expl_1 = 49.9
+# prop_expl_1 = 49.9
 prop_expl_2 = round(100*lambda_from_RV_2 / sum(lambda_from_RV_2), digits = 1 )[factor_2]
 
-x_axis = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+# x_axis = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
 # x_axis = test$mds$V1
-y_axis = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
+# y_axis = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
 
 # x_axis = x
 # y_axis = y
 
 x_lab = dist_types_names[val_1]
-x_lab = "Pol eco"
+# x_lab = "Pol eco"
 y_lab = dist_types_names[val_2]
+
+slope_plot <- coef(lm(x_axis ~ y_axis, weights = f*n))
 
 # Graphique
 ggplot() +
@@ -96,8 +112,18 @@ ggplot() +
   labs(size = "Reg. weight *f*", color = "Language") +
   scale_size_continuous(range = c(1, 8)) +
   theme_minimal() +
-  theme(legend.title = ggtext::element_markdown(lineheight = 1.2))
+  theme(legend.title = ggtext::element_markdown(lineheight = 1.2)) +
+  geom_abline(intercept = slope_plot[1], slope = slope_plot[2], color = "red", linetype="dashed")
 }
+
+
+
+# # Essais de calculs de pentes
+# angle_deg <- -acos(corr_mat_w[2])*180/pi
+# slope_plot <- tan(angle_deg * pi / 180)
+
+ggsave("wasserstein/distance_comparison/mds_wealth_OT.pdf", width = 9, height = 8)
+
 
 {
 # --- Regression
@@ -171,9 +197,9 @@ leaflet(ch_aggregated[select_lang,]) %>%
   # Ajout de la légende
   addLegend(
     pal = rev_palDiv_w,
-    values = residuals_w,
+    values = scale_range_w,
     position = "bottomright",
-    title = "Résidus",
+    title = "Residuals",
     # labFormat = labelFormat(suffix = "%"),
     labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
     
@@ -215,7 +241,7 @@ weighted.cor(x, y, f[select_lang])
 corr_mat_w = matrix(data = NA, 7,7)
 for (i in 1:7) {
   x = list_RV_W_S$Y_list[[i]][select_lang,factor_1]
-  for (j in 1:6) {
+  for (j in 1:7) {
     # if (i!=j) {
       y = list_RV_W_S$Y_list[[j]][select_lang,factor_1]
     # }

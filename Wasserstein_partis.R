@@ -151,6 +151,7 @@ ggsave(paste0("wasserstein/mds_theme", i, ".pdf"), width = 8, height = 9)
 }
 
 
+library(ggplot2)
 library(ggtext)
 mds_fun_Y2 = function(fi, K, ch){
   
@@ -178,7 +179,7 @@ mds_fun_Y2 = function(fi, K, ch){
   mds$f = fi
   mds$voters = ch$swiss_data_muni.f
   
-  mds_filtered = mds[mds$voters > sort(mds$voters, decreasing = TRUE)[30], ]
+  mds_filtered = mds[mds$voters > sort(mds$voters, decreasing = TRUE)[50], ]
   
   propDeltaPC = round(100*lambda / sum(lambda), digits = 1 )
   
@@ -191,10 +192,10 @@ mds_fun_Y2 = function(fi, K, ch){
   mds_plot = ggplot() +
     geom_vline(xintercept = 0,linetype="dashed") +
     geom_hline(yintercept = 0, linetype="dashed") +
-    geom_point(aes(x = -mds[,1], y = -mds[,2], size=fi, color=mds$langue),
+    geom_point(aes(x = -mds[,1], y = mds[,2], size=fi, color=mds$langue),
                alpha = magnif) +
     # geom_point(aes(x = mds[,1], y = -mds[,2], color=mds$langue)) +
-    geom_text(aes(x = -mds_filtered[,1], y = -mds_filtered[,2], label = mds_filtered$commune)) +
+    geom_text(aes(x = -mds_filtered[,1], y = mds_filtered[,2], label = mds_filtered$commune)) +
     scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
                        labels = c("German", "French", "Italian","Romansh")) +
     labs(x = xlab, y = ylab) +
@@ -207,10 +208,57 @@ mds_fun_Y2 = function(fi, K, ch){
   return(list(eigen_val=eigen_val,mds=mds,mds_plot=mds_plot))
 }
 
+mds_wealth_ot2 = mds_fun_Y2(f, KI, ch_aggregated_geolevels)
 mds_wealth_ot = mds_fun_Y2(f, KI, ch_aggregated_geolevels)
+
+mds_OT1 = mds_fun_Y2(f, K_OT1, ch_aggregated_geolevels)
+mds_OT1$mds_plot
+
+mds_OT2 = mds_fun_Y2(f, K_OT2, ch_aggregated_geolevels)
+mds_OT2$mds_plot
+
+mds_OT2_bis = mds_fun_Y2(f, K_OT2, ch_aggregated_geolevels)
+mds_OT2_bis$mds_plot
+
+# dist article eco
+mds_wealth1 = mds_fun_Y2(f, K_wealth1, ch_aggregated_geolevels)
+mds_wealth1$mds_plot
+
+mds_wealth2 = mds_fun_Y2(f, K_wealth2, ch_aggregated_geolevels)
+mds_wealth2$mds_plot
+
+mds_OT1 = mds_fun_Y2(f, K_OT1, ch_aggregated_geolevels)
+mds_OT1$mds_plot
+
+mds_OT2 = mds_fun_Y2(f, K_OT2, ch_aggregated_geolevels)
+mds_OT2$mds_plot
+library(plotly)
+
+ggplotly(mds_OT2$mds_plot)
+
 mds_wealth
-ggsave("wasserstein/mds_wealth.png", width = 9, height = 8)
-ggsave("wasserstein/mds_wealth.pdf", width = 9, height = 8)
+ggsave("wasserstein/art_v2/mds_wealth1.png", width = 9, height = 8)
+ggsave("wasserstein/art_v2/mds_wealth1.pdf", width = 9, height = 8)
+
+# Scree plot political eigenvalues
+
+screeValues = mds_OT2$eigen_val$values[1:20]
+dimensions = seq(1, length(screeValues))
+ggplot(data = data.frame(dimensions, screeValues), aes(x = dimensions, y = screeValues)) +
+  geom_bar(stat = "identity", fill = "grey") +
+  labs(
+    title = NULL,
+    x = expression(paste("dimension ", alpha, " = 1, ..., 20")),
+    # x = expression(paste("dimension ", alpha, " = 1, ..., n-1")),
+    # x = expression(paste("dimension ", alpha, " = 1190, ..., 1200")),
+    # y = expression(paste("eigenvalue ", mu[alpha]))
+    # y = expression(paste("eigenvalue ", dot(lambda)[alpha]))
+    y = expression(paste("eigenvalue ", lambda[alpha]))
+    # y = expression(bgroup("(", symbol(x) * "dot", ")")), bty="n")
+  ) +
+  theme_minimal()
+ggsave("wasserstein/art_v2/mds_OT2_scree.pdf", width = 6, height = 5)
+
 
 
 # --- import and compute vote distance kernel

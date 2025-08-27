@@ -1,3 +1,5 @@
+# Plot MDS theme kernel
+
 library(tidyverse)
 
 # Exemple de données

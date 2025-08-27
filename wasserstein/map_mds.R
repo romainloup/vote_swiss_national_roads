@@ -1,6 +1,6 @@
-maxDataL = ch_aggregated_geolevels$residu_road_lang[which.max( abs(mds_wealth$mds$V1) )]
+maxDataL = ch_aggregated_geolevels$residu_road_lang[which.max( abs(mds_wealth_ot$mds$V1) )]
 
-maxDataL = max(abs(mds_wealth$mds$V1))
+maxDataL = max(abs(mds_wealth_ot$mds$V1))
 
 
 
@@ -14,7 +14,7 @@ leaflet(ch_aggregated_geolevels) %>%
   setView( lat=46.637785, lng=8.2 , zoom=7) %>%
   # municipality polygons
   addPolygons(
-    fillColor = ~palDiv2(-mds_wealth$mds$V1),
+    fillColor = ~palDiv2(-mds_wealth_ot$mds$V1),
     fillOpacity = 0.9,
     color = "white",
     weight = 0.1,
@@ -25,7 +25,7 @@ leaflet(ch_aggregated_geolevels) %>%
       fillOpacity = 0.7,
       bringToFront = TRUE,
       sendToBack = TRUE),
-    label = paste0(ch_aggregated_geolevels$NAME, ": ", round(-mds_wealth$mds$V1, 2)),
+    label = paste0(ch_aggregated_geolevels$NAME, ": ", round(-mds_wealth_ot$mds$V1, 2)),
     smoothFactor = 0.2,
     # group = "MDS fac. 1",
   ) %>%
@@ -80,7 +80,8 @@ leaflet(ch_aggregated_geolevels) %>%
     position = "bottomright",
     title = "MDS value",
     # labFormat = labelFormat(suffix = "%"),
-    labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
+    # labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE), suffix = "%"),
+    labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE)),
     
     opacity = 0.9
   )

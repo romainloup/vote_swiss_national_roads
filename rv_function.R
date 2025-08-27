@@ -33,6 +33,9 @@ RV2 <- function(dist_types, f) {
   # Compute upper triangular indices
   upper_tri_indices <- upper.tri(matrix(1:(n_dist^2), n_dist, n_dist))
   
+  # Compute also diag
+  diag(upper_tri_indices) <- TRUE
+  
   # Loop through upper triangular indices
   for (k in which(upper_tri_indices)) {
     i <- (k - 1) %/% n_dist + 1
@@ -85,6 +88,7 @@ RV2 <- function(dist_types, f) {
     Y_list[[i]] <- Y
     eigen_val_list[[i]] <- eigen_val
     # nb_lambda_pos[[i]] <- nb_lambda_pos
+    print(paste("it",i))
   }
   # Replace NA values with transposed values
   E_RV[upper_tri_indices] <- t(E_RV)[upper_tri_indices]
@@ -101,3 +105,8 @@ RV2 <- function(dist_types, f) {
               nb_lambda_pos = nb_lambda_pos))
 }
 list_RV = RV2(dist_types,f)
+dist_types_test = "X"
+test = RV2(dist_types_test,f)
+test$Z_RV
+
+dist_types = c("X", "Z", "f", "P", "_wealth1", "_wealth2", "_OT1", "_OT2")
