@@ -192,10 +192,10 @@ mds_fun_Y2 = function(fi, K, ch){
   mds_plot = ggplot() +
     geom_vline(xintercept = 0,linetype="dashed") +
     geom_hline(yintercept = 0, linetype="dashed") +
-    geom_point(aes(x = -mds[,1], y = mds[,2], size=fi, color=mds$langue),
+    geom_point(aes(x = mds[,1], y = mds[,2], size=fi, color=mds$langue),
                alpha = magnif) +
     # geom_point(aes(x = mds[,1], y = -mds[,2], color=mds$langue)) +
-    geom_text(aes(x = -mds_filtered[,1], y = mds_filtered[,2], label = mds_filtered$commune)) +
+    geom_text(aes(x = mds_filtered[,1], y = mds_filtered[,2], label = mds_filtered$commune)) +
     scale_color_manual(values = c("#66C2A5", "#FC8D62", "#8DA0CB",  "#E78AC3"),
                        labels = c("German", "French", "Italian","Romansh")) +
     labs(x = xlab, y = ylab) +
@@ -242,7 +242,7 @@ ggsave("wasserstein/art_v2/mds_wealth1.pdf", width = 9, height = 8)
 
 # Scree plot political eigenvalues
 
-screeValues = mds_OT2$eigen_val$values[1:20]
+screeValues = mds_wealth1$eigen_val$values[1:20]
 dimensions = seq(1, length(screeValues))
 ggplot(data = data.frame(dimensions, screeValues), aes(x = dimensions, y = screeValues)) +
   geom_bar(stat = "identity", fill = "grey") +
@@ -257,7 +257,7 @@ ggplot(data = data.frame(dimensions, screeValues), aes(x = dimensions, y = scree
     # y = expression(bgroup("(", symbol(x) * "dot", ")")), bty="n")
   ) +
   theme_minimal()
-ggsave("wasserstein/art_v2/mds_OT2_scree.pdf", width = 6, height = 5)
+ggsave("wasserstein/art_v2/mds_wealth1_scree.png", width = 6, height = 5)
 
 
 

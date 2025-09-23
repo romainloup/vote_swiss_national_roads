@@ -8,12 +8,13 @@ richesse_mat <- as.matrix(richesse_data)
 payer_mat <- as.matrix(payer_data[, -c(1,2,13)])
 # payer_mat <- payer_mat/rowSums(payer_mat)
 
+richesse_vect = rowSums(richesse_mat)/rowSums(payer_mat)
 
 # Municipality wealth
-richesse_vect <- richesse_mat/payer_mat
+# richesse_vect <- richesse_mat/payer_mat
 
-richesse_vect[is.nan(richesse_vect)] <- 0
-richesse_vect <- rowSums(richesse_vect)
+# richesse_vect[is.nan(richesse_vect)] <- 0
+# richesse_vect <- rowSums(richesse_vect)
 
 # richesse_vect <- richesse_vect/rowSums(richesse_vect)
 
@@ -109,6 +110,16 @@ rm(d_OT2)
 K_OT1 = -0.5 * diag(sqrt(f)) %*% H %*% D_OT1 %*% t(H) %*% diag(sqrt(f)) # wealth kernel OT1
 K_OT2 = -0.5 * diag(sqrt(f)) %*% H %*% D_OT2 %*% t(H) %*% diag(sqrt(f)) # wealth kernel OT2
 
-K_wealth1 = -0.5 * diag(sqrt(f)) %*% H %*% D_wealth1 %*% t(H) %*% diag(sqrt(f)) # wealth kernel OT1
-K_wealth2 = -0.5 * diag(sqrt(f)) %*% H %*% D_wealth2 %*% t(H) %*% diag(sqrt(f)) # wealth kernel OT2
+K_wealth1 = -0.5 * diag(sqrt(f)) %*% H %*% D_wealth1 %*% t(H) %*% diag(sqrt(f)) # wealth kernel simple 1
+K_wealth2 = -0.5 * diag(sqrt(f)) %*% H %*% D_wealth2 %*% t(H) %*% diag(sqrt(f)) # wealth kernel simple 2
 
+
+dist_types = c("X", "_wealth1", "_wealth2")
+
+# --- Run RV function
+test = RV2(dist_types,f)
+test_wealth1 = mds_fun_Y2(f, K_wealth1, ch_aggregated_geolevels)
+test_wealth2 = mds_fun_Y2(f, K_wealth2, ch_aggregated_geolevels)
+
+test_wealth1$mds_plot
+test_wealth2$mds_plot

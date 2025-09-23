@@ -14,10 +14,14 @@ dist_types = c("X", "Z", "f", "P", "w", "I", "S")
 dist_types = c("X", "Z", "f", "P", "_wealth1", "_wealth2", "_OT1", "_OT2")
 dist_types = c("_wealth1", "_OT1")
 
+dist_types = c("X", "_wealth1", "_OT2")
+
 # --- Run RV function
 list_RV_W = RV2(dist_types,f)
 list_RV_W_S = RV2(dist_types,f)
 list_RV_W_S2 = RV2(dist_types,f)
+
+list_RV_W_S_subset = RV2(dist_types,f)
 
 # list_RV_W$Y_list[[2]] = -list_RV_W$Y_list[[2]]
 # list_RV_W$Y_list[[3]] = -list_RV_W$Y_list[[3]]
@@ -32,14 +36,13 @@ italian = which(ch_aggregated_geolevels$language == 3)
 romansh = which(ch_aggregated_geolevels$language == 4)
 
 dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT", "Sound")
-dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT1", "OT2")
-
+dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth1", "Wealth2", "OT1", "OT2")
 
 # --- Parameters
 # Type to compare
-val_1 = 5 # x 
-val_2 = 6
-val_3 = 4
+val_1 = 1 # x 
+val_2 = 3
+val_3 = 5
 factor_1 = 1
 factor_2 = 1
 nb_muni = 50
@@ -54,16 +57,16 @@ select_lang = romansch
 
 # Run graph
 {
-  x_axis = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+  x_axis = list_RV_W_S2$Y_list[[val_1]][select_lang,factor_1]
   x_axis = x_axis/sum(x_axis)
-  y_axis = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
+  y_axis = list_RV_W_S2$Y_list[[val_2]][select_lang,factor_2]
   y_axis = y_axis/sum(y_axis)
   
   filtered = as.data.frame(ch_aggregated_geolevels[select_lang,]$swiss_data_muni.f)
   names(filtered) = "f"
-  # filtered$x = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+  # filtered$x = list_RV_W_S2$Y_list[[val_1]][select_lang,factor_1]
   # # filtered$x = test$mds$V1
-  # filtered$y = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
+  # filtered$y = list_RV_W_S2$Y_list[[val_2]][select_lang,factor_2]
   
   filtered$x = x_axis
   # filtered$x = test$mds$V1
@@ -76,16 +79,16 @@ select_lang = romansch
   filtered = filtered[filtered$f > sort(filtered$f, decreasing = TRUE)[nb_muni+1], ]
   filtered = filtered[order(filtered$f, decreasing = TRUE),]
   
-lambda_from_RV_1 = list_RV_W_S$eigen_val_list[[val_1]]$values
-lambda_from_RV_2 = list_RV_W_S$eigen_val_list[[val_2]]$values
+lambda_from_RV_1 = list_RV_W_S2$eigen_val_list[[val_1]]$values
+lambda_from_RV_2 = list_RV_W_S2$eigen_val_list[[val_2]]$values
 
 prop_expl_1 = round(100*lambda_from_RV_1 / sum(lambda_from_RV_1), digits = 1 )[factor_1]
 # prop_expl_1 = 49.9
 prop_expl_2 = round(100*lambda_from_RV_2 / sum(lambda_from_RV_2), digits = 1 )[factor_2]
 
-# x_axis = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+# x_axis = list_RV_W_S2$Y_list[[val_1]][select_lang,factor_1]
 # x_axis = test$mds$V1
-# y_axis = list_RV_W_S$Y_list[[val_2]][select_lang,factor_2]
+# y_axis = list_RV_W_S2$Y_list[[val_2]][select_lang,factor_2]
 
 # x_axis = x
 # y_axis = y
@@ -94,7 +97,7 @@ x_lab = dist_types_names[val_1]
 # x_lab = "Pol eco"
 y_lab = dist_types_names[val_2]
 
-slope_plot <- coef(lm(x_axis ~ y_axis, weights = f*n))
+slope_plot <- coef(lm(x_axis ~ y_axis, weights = f[select_lang]*length(select_lang)))
 
 # Graphique
 ggplot() +
@@ -122,7 +125,7 @@ ggplot() +
 # angle_deg <- -acos(corr_mat_w[2])*180/pi
 # slope_plot <- tan(angle_deg * pi / 180)
 
-ggsave("wasserstein/distance_comparison/mds_wealth_OT.pdf", width = 9, height = 8)
+ggsave("wasserstein/art_v2/kernel_comparison/mds_Wealth1_OT2.png", width = 9, height = 8)
 
 
 {
@@ -221,14 +224,14 @@ weighted.cor <- function(u, v, w) {
 
 # dist_types_names = c("Pol", "Time", "Size", "Lang", "Wealth", "OT")
 # Régression pondérée 2ers facteurs MDS sur toutes les votations
-z = list_RV_W_S$Y_list[[val_3]][select_lang,factor_1]
-x = list_RV_W_S$Y_list[[val_1]][select_lang,factor_1]
+z = list_RV_W_S2$Y_list[[val_3]][select_lang,factor_1]
+x = list_RV_W_S2$Y_list[[val_1]][select_lang,factor_1]
 reg_model_x = lm(x ~ z, weights = f[select_lang]) # faire aussi avec résidu à la place de resultat.jaStimmenInProzent 
 # Résidus
 residuals_x = x - predict(reg_model_x)
 
 # Reg 2
-y = list_RV_W_S$Y_list[[val_2]][select_lang,factor_1]
+y = list_RV_W_S2$Y_list[[val_2]][select_lang,factor_1]
 reg_model_y = lm(y ~ z, weights = f[select_lang])
 # Résidus
 residuals_y = y - predict(reg_model_y)
@@ -238,12 +241,13 @@ partial_cor
 
 weighted.cor(x, y, f[select_lang])
 
-corr_mat_w = matrix(data = NA, 7,7)
-for (i in 1:7) {
-  x = list_RV_W_S$Y_list[[i]][select_lang,factor_1]
-  for (j in 1:7) {
+dim_mat = length(dist_types_names)
+corr_mat_w = matrix(data = NA, dim_mat,dim_mat)
+for (i in 1:dim_mat) {
+  x = list_RV_W_S2$Y_list[[i]][select_lang,factor_1]
+  for (j in 1:dim_mat) {
     # if (i!=j) {
-      y = list_RV_W_S$Y_list[[j]][select_lang,factor_1]
+      y = list_RV_W_S2$Y_list[[j]][select_lang,factor_1]
     # }
     corr_mat_w[i,j] = weighted.cor(x, y, f[select_lang])
   }
